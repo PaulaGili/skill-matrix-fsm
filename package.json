@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gate": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && node scripts/ci/check-bundle.mjs",
+    "e2e": "playwright test",
+    "gate": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && node scripts/ci/check-bundle.mjs && npm run e2e",
     "check:fsm": "node --env-file=.env.local scripts/check-connection.mjs",
     "smoke": "tsx --env-file=.env.local tests/fsm-smoke.ts",
     "seed": "tsx --env-file=.env.local scripts/fsm/seed.ts",
@@ -35,6 +36,7 @@
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

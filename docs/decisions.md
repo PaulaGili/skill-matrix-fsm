@@ -77,5 +77,6 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 
 - `npm run gate` runs typecheck, lint, unit tests, the build and a check that the OAuth secret is not in any file the browser downloads. CI runs the same steps.
 - Unit tests (Vitest) cover the pure rules: statuses, dates, file checks, namespace checks and the mapping of FSM responses.
+- Browser tests (Playwright) run against the production build with FSM mocked in the browser, so CI needs no credentials and never writes to the shared company. One of them checks that the matrix loads with four FSM calls.
 - `npm run smoke` exercises the service layer against the real company and deletes what it created.
 - `npm run seed` creates 5 skills, 10 assignments and 4 sample certificates with dates relative to today, and skips what already exists. `npm run cleanup` only lists unless called with `-- --yes`.
