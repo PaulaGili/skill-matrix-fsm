@@ -15,6 +15,7 @@ import {
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import shell from "@/components/common/AppShell.module.css";
 import { LoadError, Loading } from "@/components/common/LoadState";
+import { STATUS_LABELS } from "@/components/common/StatusBadge";
 import { useToast } from "@/components/common/useToast";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import {
@@ -28,9 +29,11 @@ import {
   skillsWithMatches,
   type CellFilter,
 } from "@/lib/domain/matrix";
+import { matrixTable } from "@/lib/domain/export";
 import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Person, Skill } from "@/lib/fsm/services/model";
+import { ExportMenu } from "./ExportMenu";
 import { MatrixCell } from "./MatrixCell";
 import { MatrixFilters } from "./MatrixFilters";
 import styles from "./SkillMatrix.module.css";
@@ -138,9 +141,14 @@ export function SkillMatrix() {
     <>
       <div className={styles.header}>
         <Title level="H2">Skill matrix</Title>
-        <Button icon="refresh" tooltip="Load the current data from SAP FSM" disabled={loading} onClick={reload}>
-          Refresh
-        </Button>
+        <span className={styles.inline}>
+          {data.skills.length > 0 && (
+            <ExportMenu getRows={() => matrixTable(persons, skills, cells, filters, (status) => STATUS_LABELS[status].text)} onError={showToast} />
+          )}
+          <Button icon="refresh" tooltip="Load the current data from SAP FSM" disabled={loading} onClick={reload}>
+            Refresh
+          </Button>
+        </span>
       </div>
       {error && <LoadError message={error} onRetry={reload} />}
 

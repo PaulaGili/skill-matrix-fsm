@@ -71,6 +71,7 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
   - Without skills selected, one passing cell in any skill is enough, and the columns without a passing cell are hidden so the result is not a grid of dashes.
   - With a filter on, a cell that does not pass is left blank, so "No certificate" does not show the same person's certified skills next to the uncertified one.
 - If FSM holds two skills for the same person and tag, the cell shows the one that stays valid longest.
+- Export downloads the matrix as it is shown, with the active filters, as Excel or CSV. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
 
 ## Tooling
 
