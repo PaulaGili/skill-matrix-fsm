@@ -1,0 +1,67 @@
+.form {
+  display: grid;
+  gap: 0.5rem;
+  width: min(32rem, 85vw);
+  padding: 0.5rem 0;
+}
+
+.form > [ui5-select],
+.form > [ui5-date-picker] {
+  width: 100%;
+}
+
+.dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.dates > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.dates [ui5-date-picker] {
+  width: 100%;
+}
+
+.sectionTitle {
+  margin-top: 0.75rem;
+}
+
+.files {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.files li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fileName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.removed {
+  text-decoration: line-through;
+  color: var(--sapContent_LabelColor);
+}
+
+.hint {
+  color: var(--sapContent_LabelColor);
+  font-size: var(--sapFontSize);
+}
+
+.error {
+  color: var(--sapNegativeTextColor);
+  font-size: var(--sapFontSize);
+}
