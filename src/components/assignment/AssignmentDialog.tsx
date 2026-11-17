@@ -3,7 +3,9 @@
 import { useCallback, useState } from "react";
 import { Bar, Button, DatePicker, Dialog, Label, MessageStrip, Option, Select, Text } from "@ui5/webcomponents-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { validateValidity } from "@/lib/domain/status";
+import { isAiEnabled, readCertificateFacts } from "@/lib/ai/client";
+import { checkFacts, type Suggestion } from "@/lib/domain/certificate-facts";
+import { formatDate, todayIso, validateValidity } from "@/lib/domain/status";
 import { fileToBase64 } from "@/lib/fsm/client";
 import { toUserMessage } from "@/lib/fsm/errors";
 import type { Assignment, Certificate, Person, Skill } from "@/lib/fsm/services/model";
@@ -35,6 +37,8 @@ export function AssignmentDialog({ person, skill, assignment, certificates, relo
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [messages, setMessages] = useState<string[]>([]);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const [suggestion, setSuggestion] = useState<(Suggestion & { fileName: string }) | null>(null);
   const [busy, setBusy] = useState(false);
 
   const dateError = validateValidity(startDate || null, endDate || null);
@@ -63,6 +67,26 @@ export function AssignmentDialog({ person, skill, assignment, certificates, relo
     }
     setBusy(false);
     onChanged();
+  }
+
+  // The AI only proposes. The dates go into the form when the user accepts them, and
+  // nothing is saved before Save.
+  async function readWithAi(file: File) {
+    setBusy(true);
+    setMessages([]);
+    setSuggestion(null);
+    try {
+      setSuggestion({ fileName: file.name, ...checkFacts(await readCertificateFacts(file), person.displayName, todayIso()) });
+    } catch (error) {
+      setMessages([toUserMessage(error)]);
+    }
+    setBusy(false);
+  }
+
+  function applySuggestion() {
+    if (suggestion?.validFrom) setStartDate(suggestion.validFrom);
+    if (suggestion?.validTo) setEndDate(suggestion.validTo);
+    setSuggestion(null);
   }
 
   async function remove() {
@@ -119,6 +143,17 @@ export function AssignmentDialog({ person, skill, assignment, certificates, relo
             {message}
           </MessageStrip>
         ))}
+        {suggestion && (
+          <MessageStrip design={suggestion.notes.length > 0 ? "Critical" : "Information"} onClose={() => setSuggestion(null)}>
+            <div className={styles.suggestion}>
+              <Text>
+                Read from {suggestion.fileName} by AI: valid from {suggestion.validFrom ? formatDate(suggestion.validFrom) : "not found"}, valid to{" "}
+                {suggestion.validTo ? formatDate(suggestion.validTo) : "not found"}. {suggestion.notes.join(" ")}
+              </Text>
+              {(suggestion.validFrom || suggestion.validTo) && <Button onClick={applySuggestion}>Use these dates</Button>}
+            </div>
+          </MessageStrip>
+        )}
         {confirmingRemove && (
           <MessageStrip design="Critical" hideCloseButton>
             This removes the assignment
@@ -185,6 +220,7 @@ export function AssignmentDialog({ person, skill, assignment, certificates, relo
           onToggleRemoved={(id) => setRemovedIds((ids) => (ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id]))}
           onNewFiles={setNewFiles}
           onRejected={setMessages}
+          onRead={aiEnabled ? readWithAi : undefined}
         />
       </div>
     </Dialog>

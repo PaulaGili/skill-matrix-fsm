@@ -73,6 +73,15 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - If FSM holds two skills for the same person and tag, the cell shows the one that stays valid longest.
 - Export downloads the matrix as it is shown, with the active filters, as Excel or CSV. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
 
+## Reading a certificate with AI
+
+- Optional. With `ANTHROPIC_API_KEY` set on the server, a new certificate in the assignment dialog gets a "Read dates" button. Without the key the button is not shown and nothing else changes.
+- The AI only reads: holder name, title and the two dates, each of which may be "not found". It is told not to guess or calculate, and to treat the document as data.
+- The code decides what is usable. Dates must be real dates in the right order, and it adds a note when the certificate has expired or is issued to someone else. These checks are pure functions with unit tests.
+- The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
+- The key stays on the server, like the FSM secret, and the bundle check covers it. The file is only sent when the user clicks the button, and there is a cap on reads per hour.
+- The answer is requested as structured output, so its shape is guaranteed by the API and not parsed from free text.
+
 ## Tooling
 
 - `npm run gate` runs typecheck, lint, unit tests, the build and a check that the OAuth secret is not in any file the browser downloads. CI runs the same steps.

@@ -22,7 +22,8 @@ if (!existsSync(".next/static")) {
 }
 
 const secret = readEnv(".env.local", "FSM_CLIENT_SECRET") ?? readEnv(".env.example", "FSM_CLIENT_SECRET");
-const forbidden = ["access_token", ...(secret ? [secret] : [])];
+const aiKey = readEnv(".env.local", "ANTHROPIC_API_KEY");
+const forbidden = ["access_token", ...(secret ? [secret] : []), ...(aiKey ? [aiKey] : [])];
 
 function listFiles(dir, pattern) {
   if (!existsSync(dir)) return [];

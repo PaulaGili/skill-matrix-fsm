@@ -15,11 +15,12 @@ interface Props {
   onToggleRemoved: (id: string) => void;
   onNewFiles: (files: File[]) => void;
   onRejected: (messages: string[]) => void;
+  onRead?: (file: File) => void; // read the dates with AI, only when it is configured
 }
 
 // Existing certificates can be opened or marked for deletion, and new files are queued.
 // Nothing is written until the dialog is saved.
-export function CertificateSection({ certificates, removedIds, newFiles, disabled, onToggleRemoved, onNewFiles, onRejected }: Props) {
+export function CertificateSection({ certificates, removedIds, newFiles, disabled, onToggleRemoved, onNewFiles, onRejected, onRead }: Props) {
   function addFiles(selected: FileList | null) {
     const accepted: File[] = [];
     const rejected: string[] = [];
@@ -61,6 +62,17 @@ export function CertificateSection({ certificates, removedIds, newFiles, disable
           <li key={`${file.name}-${index}`}>
             <span className={styles.fileName}>{file.name}</span>
             <span className={styles.hint}>new</span>
+            {onRead && (
+              <Button
+                design="Transparent"
+                icon="ai"
+                disabled={disabled}
+                tooltip="Sends this file to the AI service to read the validity dates"
+                onClick={() => onRead(file)}
+              >
+                Read dates
+              </Button>
+            )}
             <Button
               design="Transparent"
               icon="decline"

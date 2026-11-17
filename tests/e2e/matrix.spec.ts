@@ -56,3 +56,34 @@ test("assigning a skill validates the dates and sends them to FSM", async ({ pag
   const created = calls.find((call) => call.path === "skill/v2/skills");
   expect(created?.body).toEqual([{ tagId: "T2", technician: "P2", startDate: "2026-01-01", endDate: "2026-12-31" }]);
 });
+
+test("AI proposes the dates of a certificate and the user decides", async ({ page }) => {
+  await mockFsm(page);
+  await page.route("**/api/ai/certificate", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({ json: { enabled: true } })
+      : route.fulfill({ json: { holderName: "Eva Graf", title: "First aid course", validFrom: "2026-03-01", validTo: "2028-02-29" } }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Baumann, Beat, First Aid: not assigned. Assign" }).click();
+  await page.locator("ui5-file-uploader input[type=file]").setInputFiles("tests/fixtures/sample-certificate.pdf");
+
+  await page.getByRole("button", { name: "Read dates" }).click();
+  await expect(page.getByText("valid from 01.03.2026, valid to 29.02.2028")).toBeVisible();
+  await expect(page.getByText('The certificate is issued to "Eva Graf", not to Baumann, Beat.')).toBeVisible();
+  await expect(page.locator("#valid-from input")).toHaveValue("");
+
+  await page.getByRole("button", { name: "Use these dates" }).click();
+  await expect(page.locator("#valid-from input")).toHaveValue("01.03.2026");
+  await expect(page.locator("#valid-to input")).toHaveValue("29.02.2028");
+});
+
+test("without an AI key the Read dates button is not offered", async ({ page }) => {
+  await mockFsm(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Baumann, Beat, First Aid: not assigned. Assign" }).click();
+  await page.locator("ui5-file-uploader input[type=file]").setInputFiles("tests/fixtures/sample-certificate.pdf");
+
+  await expect(page.getByText("sample-certificate.pdf")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Read dates" })).toBeHidden();
+});
