@@ -17,13 +17,21 @@ export class FsmError extends Error {
   }
 }
 
-const PROXY = "/api/fsm";
+let proxyBase = "/api/fsm";
 const MAX_PAGE_SIZE = 1000;
+
+/**
+ * Node scripts (smoke, seed, cleanup) run outside the browser and need an absolute URL to the
+ * running app, e.g. `http://localhost:3000/api/fsm`. They still go through the proxy.
+ */
+export function setProxyBaseUrl(url: string): void {
+  proxyBase = url.replace(/\/$/, "");
+}
 
 async function call<T>(path: string, init: RequestInit & { params?: Record<string, string | number | boolean> } = {}): Promise<T> {
   const { params, ...rest } = init;
   const qs = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}` : "";
-  const res = await fetch(`${PROXY}/${path}${qs}`, {
+  const res = await fetch(`${proxyBase}/${path}${qs}`, {
     ...rest,
     headers: { "Content-Type": "application/json", ...(rest.headers ?? {}) },
   });
@@ -115,7 +123,7 @@ export async function fsmDelete(entity: DtoEntity, id: string): Promise<void> {
 
 /** URL that streams an attachment's binary through the proxy (usable in <a href>, <img src>, <iframe>). */
 export function attachmentContentUrl(attachmentId: string): string {
-  return `${PROXY}/data/v4/Attachment/${encodeURIComponent(attachmentId)}/content`;
+  return `${proxyBase}/data/v4/Attachment/${encodeURIComponent(attachmentId)}/content`;
 }
 
 /** File → base64 (without the `data:...;base64,` prefix), as expected by `Attachment.fileContent`. */

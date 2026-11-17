@@ -1,0 +1,91 @@
+// Certificates = FSM Attachments on a Skill. Reads use the Query API (one JOIN returns the
+// certificates of all our skills); files are uploaded, streamed and deleted through the Data API.
+import { attachmentContentUrl, fsmCreate, fsmDelete, fsmQuery } from "@/lib/fsm/client";
+import { CANDIDATE_ID_VALID, NAME_PREFIX } from "@/lib/candidate";
+import { checkCertificateFile } from "@/lib/domain/certificate";
+import { toUserMessage } from "@/lib/fsm/errors";
+import type { FsmAttachment } from "@/lib/fsm/types";
+import { requireOwnAssignments } from "./assignments";
+import { OwnershipError } from "./ownership";
+import { dedupeById } from "./persons";
+import type { Certificate } from "./model";
+
+// Query rows are flat inside the alias, so nested fields arrive as "object.objectId".
+export type AttachmentRow = {
+  a: { id: string; fileName: string; type: string; createDateTime?: string; "object.objectId": string };
+};
+
+export interface CertificateUpload {
+  fileName: string;
+  sizeBytes: number;
+  base64: string;
+}
+
+export function toCertificates(rows: AttachmentRow[]): Certificate[] {
+  return dedupeById(rows.map((row) => row.a)).map((a) => ({
+    id: a.id,
+    assignmentId: a["object.objectId"],
+    fileName: a.fileName,
+    type: a.type,
+    createdAt: a.createDateTime ?? null,
+  }));
+}
+
+export async function listCertificates(): Promise<Certificate[]> {
+  // The prefix goes into the query text, so it must be a validated candidate id.
+  if (!CANDIDATE_ID_VALID) throw new OwnershipError("NEXT_PUBLIC_CANDIDATE_ID is missing or invalid.");
+  const sql = `
+    SELECT a.id, a.fileName, a.type, a.createDateTime, a.object.objectId
+    FROM Attachment a
+    JOIN Skill s ON s.id = a.object.objectId
+    JOIN Tag t ON t.id = s.tag
+    WHERE a.object.objectType = 'SKILL' AND t.name LIKE '${NAME_PREFIX}%'
+    ORDER BY a.createDateTime DESC`;
+  return toCertificates(await fsmQuery<AttachmentRow>(sql, ["Attachment", "Skill", "Tag"]));
+}
+
+// Uploads the files one by one and returns a message for each file that failed, so one bad
+// file does not stop the others.
+export async function uploadCertificates(skillId: string, assignmentId: string, files: CertificateUpload[]): Promise<string[]> {
+  if (files.length === 0) return [];
+  await requireOwnAssignments(skillId, [assignmentId]);
+
+  const failures: string[] = [];
+  for (const file of files) {
+    const check = checkCertificateFile(file.fileName, file.sizeBytes);
+    if (!check.ok) {
+      failures.push(check.error);
+      continue;
+    }
+    try {
+      await fsmCreate<FsmAttachment>("Attachment", {
+        fileName: file.fileName,
+        title: file.fileName,
+        type: check.type,
+        fileContent: file.base64,
+        object: { objectId: assignmentId, objectType: "SKILL" },
+      });
+    } catch (error) {
+      failures.push(`${file.fileName}: ${toUserMessage(error)}`);
+    }
+  }
+  return failures;
+}
+
+// Only ids that FSM lists on one of our skills can be deleted.
+export async function deleteCertificates(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const own = new Set((await listCertificates()).map((certificate) => certificate.id));
+  const foreign = ids.find((id) => !own.has(id));
+  if (foreign) throw new OwnershipError(`Certificate ${foreign} is not linked to one of your skills.`);
+  for (const id of ids) await fsmDelete("Attachment", id);
+}
+
+export async function deleteCertificatesOf(assignmentIds: string[]): Promise<void> {
+  const certificates = (await listCertificates()).filter((certificate) => assignmentIds.includes(certificate.assignmentId));
+  for (const certificate of certificates) await fsmDelete("Attachment", certificate.id);
+}
+
+export function certificateUrl(certificate: Certificate): string {
+  return attachmentContentUrl(certificate.id);
+}
