@@ -1,0 +1,13 @@
+.next
+node_modules
+package-lock.json
+next-env.d.ts
+
+# Files from the assessment template keep their original formatting.
+ASSIGNMENT.md
+docs/FSM_GUIDE.md
+README.md
+tsconfig.json
+src/app/api
+src/lib/fsm/client.ts
+src/components/StarterPage.tsx
