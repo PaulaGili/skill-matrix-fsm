@@ -1,8 +1,5 @@
-import { StarterPage } from "@/components/StarterPage";
+import { SkillMatrix } from "@/components/matrix/SkillMatrix";
 
-/**
- * Entry point. Replace <StarterPage /> with your skill management app.
- */
-export default function Home() {
-  return <StarterPage />;
+export default function MatrixPage() {
+  return <SkillMatrix />;
 }
