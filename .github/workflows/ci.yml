@@ -24,3 +24,5 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node scripts/ci/check-bundle.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
