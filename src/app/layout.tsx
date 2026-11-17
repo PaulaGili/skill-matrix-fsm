@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@ui5/webcomponents-react/styles.css";
 import "./globals.css";
+import { AppShell } from "@/components/common/AppShell";
 import { AppProviders } from "@/components/providers/AppProviders";
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AppShell>{children}</AppShell>
+        </AppProviders>
       </body>
     </html>
   );

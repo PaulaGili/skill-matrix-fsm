@@ -1,0 +1,11 @@
+.form {
+  display: grid;
+  gap: 0.5rem;
+  min-width: min(28rem, 80vw);
+  padding: 0.5rem 0;
+}
+
+.form > [ui5-input],
+.form > [ui5-textarea] {
+  width: 100%;
+}

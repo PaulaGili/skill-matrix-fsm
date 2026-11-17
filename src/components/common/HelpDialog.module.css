@@ -1,0 +1,33 @@
+.help {
+  display: grid;
+  gap: 0.5rem;
+  width: min(36rem, 85vw);
+  padding: 0.5rem 0;
+}
+
+.help [ui5-title]:not(:first-child) {
+  margin-top: 0.5rem;
+}
+
+.statuses {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+}
+
+.statuses > div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.statuses dt {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.statuses dd {
+  margin: 0;
+}
