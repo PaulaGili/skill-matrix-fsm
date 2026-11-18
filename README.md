@@ -66,6 +66,8 @@ Most teams already keep this list in Excel. Every row is checked and says why it
 
 ![The import preview: two rows ready, four rows with the reason why not](docs/images/import.png)
 
+Want to try it? The [`samples`](samples) folder has three files ready, one of them full of mistakes on purpose.
+
 ### Auch auf Deutsch
 
 One click and the whole app speaks German, in Swiss spelling.
