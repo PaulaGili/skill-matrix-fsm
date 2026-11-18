@@ -301,4 +301,4 @@ I built this with Claude Code. It wrote most of the code, the tests and the firs
 - **I broke things to test the tests.** For the tests I added late, I changed the code so it was wrong and made sure they went red.
 - **The AI features got the same treatment.** That is what the evaluation is for. It asks every case several times, because a single run of a model tells you very little.
 
-Working like this is fast. It also produces a lot of detail that sounds right and is wrong, so most of my time went into saying what I wanted, checking what I got and deciding what to leave out. I was not strict enough about leaving things out, and that is why this repository is bigger than the assignment.
+Working like this is fast, and speed is the easy part. A model sounds just as sure when it is wrong, so most of my time went into saying exactly what I wanted, checking what I got and deciding what to leave out. That is the part I enjoy, and the part I would bring to your team.
