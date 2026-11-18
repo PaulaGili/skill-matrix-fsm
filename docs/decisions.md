@@ -24,9 +24,14 @@ The app uses the words of the assignment: Skill (FSM Tag), Assignment (FSM Skill
 
 ## Writes in the shared company
 
-The proxy limits which entities can be written, but it cannot know whose tag it is. Every update and delete therefore takes an id, reads the record back from FSM and checks that it is in our namespace before writing. The check reads our skills and assignments again. A save does this once: creating or updating the assignment checks it, and the certificate upload in the same save reuses that check. With much more data it would read the single record instead.
+The proxy of the assessment limits which entities can be written, but it cannot know whose tag it is. Ownership is therefore checked in two places.
 
-Scripts (`seed`, `cleanup`, the smoke test) go through the app's proxy as well, so the same write rules apply to them.
+- On the server, in front of the proxy (`src/proxy.ts`, `src/lib/fsm/write-guard.ts`). Every write to FSM is inspected before it is passed on: a tag or scale must carry our prefix, and a tag, skill, scale or attachment that is changed or deleted must be one that FSM lists in our namespace. For that the server reads our ids from FSM itself, with one to three list calls per write, and trusts nothing the browser sent. A write the app does not make at all is refused. If FSM cannot be asked, nothing is written. This check cannot be skipped by calling `/api/fsm` directly.
+- In the browser, in the services. Every update and delete takes an id, reads the record back from FSM and checks it before writing. This is what gives the user a clear message in the right language, and it notices a change someone else made in the meantime.
+
+The first version had only the check in the browser, with the access code in front of a hosted copy. A review pointed out that the browser is the wrong place to enforce a rule, so the server check was added. The price is the extra reads on every write; reads are not affected.
+
+Scripts (`seed`, `cleanup`, the smoke test) go through the app's proxy as well, so the same rules apply to them.
 
 ## Removing data
 
@@ -181,11 +186,11 @@ The import writes all rows in one request through the same service as the dialog
 
 ## Access code
 
-- The app has no login, and the checks that keep writes inside the namespace run in the browser. A copy on a public URL would let anyone write to the shared company and use the AI key.
+- The app has no login. The server keeps every write inside our namespace, but a copy on a public URL would still let anyone change our own data and use the AI key.
 - `APP_ACCESS_CODE` closes that: when it is set, `src/proxy.ts` answers every page and every API route, the FSM proxy and the AI routes included, with 401 until the browser sends the code. Without the variable nothing changes, so local work, the tests and CI are not affected.
 - It is one shared code, not a login per person: enough to keep a demo URL private, not a replacement for real authentication.
 - In demo mode the 403 above comes before the code is asked for.
-- A copy on Vercel that talks to the real FSM without `APP_ACCESS_CODE` answers 503 on every request and says which variable is missing. The reason is the same: the ownership checks run in the browser, so the code is what keeps the URL from being an open door.
+- A copy on Vercel that talks to the real FSM without `APP_ACCESS_CODE` answers 503 on every request and says which variable is missing, so a real copy cannot go online unprotected by accident.
 - The code is compared in constant time. The app also sends `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy: same-origin`, and `Content-Security-Policy: sandbox` on everything that comes from FSM, so an uploaded file is shown or downloaded and never run as a page of the app.
 - Not covered: wrong codes are not counted or slowed down.
 

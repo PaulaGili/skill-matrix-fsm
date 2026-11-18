@@ -46,7 +46,7 @@ Useful to know:
 
 | Command | What it does |
 |---|---|
-| `npm run gate` | Everything CI runs: types, lint, format, 138 unit tests, build, a check that no secret is in the browser files, 19 browser tests. Run `npx playwright install chromium` once before it. |
+| `npm run gate` | Everything CI runs: types, lint, format, 144 unit tests, build, a check that no secret is in the browser files, 19 browser tests. Run `npx playwright install chromium` once before it. |
 | `npm run seed` | Writes demo data to FSM in your namespace: 7 skills, 13 assignments, 5 certificates. |
 | `npm run cleanup -- --yes` | Deletes everything in your namespace. Without `--yes` it only lists it. |
 | `npm run smoke` | Runs the service layer against the real company with one throwaway skill. Needs the app running. |
@@ -94,9 +94,15 @@ Deleting everything is possible too. It takes one more step, and you have to typ
 
 ### Staying inside my namespace
 
-The proxy limits which entities can be written, but it cannot know whose tag it is. So every update and delete reads the record back from FSM first and checks that it is mine. Deleting checks twice on purpose. It costs a few extra reads. In a company I share with other candidates, I would rather read twice.
+The proxy limits which entities can be written, but it cannot know whose tag it is. So ownership is checked twice, in two different places.
 
-These checks run in the browser, so a copy on a public URL needs something in front of it. With `APP_ACCESS_CODE` set, nothing is served without the code. A copy on Vercel that talks to the real FSM without a code refuses to work and says why.
+On the server, a small guard stands in front of the proxy and looks at every write before it is passed on. A tag or scale has to carry my prefix, and anything that is changed or deleted has to be something FSM lists in my namespace. The server reads those ids from FSM itself and trusts nothing the browser sent. A write that the app never makes is refused, and if FSM cannot be asked, nothing is written. Calling `/api/fsm` directly does not get around it.
+
+In the browser, every update and delete reads the record back first. That is where the user gets a clear message, and where the app notices that someone else changed the record in the meantime.
+
+My first version only had the check in the browser. A review pointed out that this is the wrong place to enforce a rule, and it was right. The price of the server check is one to three extra reads per write. Reads are not affected.
+
+A hosted copy still asks for a code. With `APP_ACCESS_CODE` set, nothing is served without it, and a copy on Vercel that talks to the real FSM without a code refuses to work and says why.
 
 ### Two things FSM does that surprised me
 
@@ -176,7 +182,7 @@ It hands the names and skills of the technicians to whichever assistant is conne
 
 ## Tests and CI
 
-- 138 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership guards and the access code.
+- 144 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
 - 19 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
 - A smoke test against the real company for the things only FSM can answer.
 - GitHub Actions runs `npm run gate` on every pull request, the same command as on my machine.
@@ -197,7 +203,6 @@ There is no data fetching or state library. The app loads four lists and reloads
 ## What I would do differently
 
 - Start smaller. The import and the MCP server taught me a lot, but a real login would have been worth more to a customer.
-- Move the "is this mine?" checks to the server. Today they run in the browser, and the access code is what protects a hosted copy.
 - Test the AI with real scans from real technicians, with their consent.
 - Raise the limit of 20 rows per import. It is there because of the rule about bulk imports in the shared company; the preview can already be sorted for longer files.
 

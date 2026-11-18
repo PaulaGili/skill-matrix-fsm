@@ -13,8 +13,9 @@ export function accessAllowed(authorization: string | null, code: string | undef
   return timingSafeEqual(digest(password.join(":")), digest(code));
 }
 
-// A hosted copy that talks to the real FSM has to ask for a code: the checks that a record is
-// ours run in the browser, so without a code anyone with the URL could write to the company.
+// A hosted copy that talks to the real FSM has to ask for a code. The server only lets writes
+// to our own data through, but without a code anyone with the URL could change that data
+// and spend the AI key.
 export function needsAccessCode(env: { hosted: boolean; demo: boolean; code: string | undefined }): boolean {
   return env.hosted && !env.demo && !env.code;
 }
