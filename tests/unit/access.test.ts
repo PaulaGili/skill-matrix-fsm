@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { accessAllowed, closedInDemo, needsAccessCode } from "@/lib/access";
 import { config } from "@/proxy";
+
+// The proxy imports server code that refuses to load outside a server. Here only its matcher is read.
+vi.mock("server-only", () => ({}));
 
 const basic = (user: string, password: string) => `Basic ${btoa(`${user}:${password}`)}`;
 
