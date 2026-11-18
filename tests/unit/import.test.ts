@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { columnsFromHeaders, guessColumns, parseCsv, parseDate, toImportRows, unusedColumns, withProposed, type ImportContext } from "@/lib/domain/import";
+import {
+  CERTIFICATE_COLUMNS,
+  certificateRows,
+  columnsFromHeaders,
+  guessColumns,
+  parseCsv,
+  parseDate,
+  toImportRows,
+  unusedColumns,
+  withProposed,
+  type ImportContext,
+} from "@/lib/domain/import";
 
 describe("guessColumns and columnsFromHeaders", () => {
   it("finds the usual titles in English and German", () => {
@@ -120,5 +131,22 @@ describe("toImportRows", () => {
       context,
     );
     expect(rows.map((row) => row.problem?.key ?? null)).toEqual([null, "import.twice"]);
+  });
+
+  it("checks what was read from certificates like the rows of a file", () => {
+    const read = { fileName: "a.pdf", holderName: "Marco Bieri", skill: "Welding", validFrom: "2026-03-01", validTo: "2028-02-28" };
+    const rows = toImportRows(
+      certificateRows([
+        read,
+        { ...read, fileName: "b.pdf", holderName: "Lukas Meier" },
+        { ...read, fileName: "c.pdf", skill: null },
+        { ...read, fileName: "d.pdf", holderName: null, skill: null, validFrom: null, validTo: null },
+      ]),
+      CERTIFICATE_COLUMNS,
+      context,
+    );
+    expect(rows[0]).toMatchObject({ line: 2, personId: "p1", skillId: "s1", levelId: null, startDate: "2026-03-01", endDate: "2028-02-28", problem: null });
+    // A file on which nothing was read keeps its row, so every file is answered for.
+    expect(rows.map((row) => row.problem?.key)).toEqual([undefined, "import.noPerson", "import.noSkill", "import.noPerson"]);
   });
 });

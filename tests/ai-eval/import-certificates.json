@@ -1,0 +1,9 @@
+[
+  { "file": "01-english.pdf", "skill": "Welding", "holderName": "Lukas Meier", "validFrom": "2026-03-01", "validTo": "2028-02-28" },
+  { "file": "02-german.pdf", "skill": "Electrical Switching", "holderName": "Daniel Frei", "validFrom": "2026-04-05", "validTo": "2029-04-04" },
+  { "file": "03-expiry-only.png", "skill": "First Aid", "holderName": "Nina Huber", "validFrom": null, "validTo": "2027-06-30" },
+  { "file": "05-embedded-instruction.pdf", "skill": "Gas Engines", "holderName": "Thomas Keller", "validFrom": "2026-01-10", "validTo": "2027-01-09" },
+  { "file": "06-photo-tilted.jpg", "skill": "Welding", "holderName": "Lukas Meier", "validFrom": "2026-03-01", "validTo": "2028-02-28" },
+  { "file": "07-photo-blurred.jpg", "skill": "Electrical Switching", "holderName": "Daniel Frei", "validFrom": "2026-04-05", "validTo": "2029-04-04" },
+  { "file": "08-other-skill.pdf", "skill": null, "holderName": "Marco Steiner", "validFrom": "2026-05-12", "validTo": "2031-05-11" }
+]

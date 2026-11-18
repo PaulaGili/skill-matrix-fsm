@@ -4,7 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 
-// One small model for all four features. The evaluation compared it with the strong model
+// One small model for all five features. The evaluation compared it with the strong model
 // on the certificates, phone photos included: the same answers, faster and far cheaper.
 export const MODEL = "claude-haiku-5-5";
 

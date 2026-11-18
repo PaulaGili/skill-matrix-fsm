@@ -191,7 +191,9 @@ test("an import file is checked row by row before anything is saved", async ({ p
   await page.getByRole("button", { name: "Import", exact: true }).click();
 
   const csv = ["Wer;Was;Ablauf", "Carla Conti;Welding;31.12.2030", "Anna Aerni;Welding;", "Nobody;Welding;", "Beat Baumann;First Aid;soon"].join("\n");
-  await page.locator("ui5-file-uploader input[type=file]").setInputFiles({ name: "skills.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await page
+    .locator("ui5-file-uploader input[type=file]:not([multiple])")
+    .setInputFiles({ name: "skills.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
 
   // Unusual titles go to the AI only on a click, the rows do not.
   expect(titles).toBeUndefined();
@@ -207,6 +209,48 @@ test("an import file is checked row by row before anything is saved", async ({ p
   await expect(page.getByText("1 assignment imported.")).toBeVisible();
   const create = calls.slice(before).find((call) => call.path === "skill/v2/skills");
   expect(create?.body).toMatchObject([{ tagId: "T1", technician: "P3", endDate: "2030-12-31" }]);
+});
+
+test("certificates are read by AI into import rows, checked by the code and attached when imported", async ({ page }) => {
+  const calls = await mockFsm(page);
+  const sent: { fileName: string; skills: string[] }[] = [];
+  const read = { holderName: "Carla Conti", skill: "Welding", validFrom: "2026-03-01", validTo: "2030-12-31" };
+  await page.route("**/api/ai", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai/certificate", (route) => {
+    const body = route.request().postDataJSON();
+    sent.push({ fileName: body.fileName, skills: body.skills });
+    if (body.fileName === "torn.pdf") return route.fulfill({ status: 422, json: { error: "No answer." } });
+    if (body.fileName === "stranger.pdf") return route.fulfill({ json: { ...read, holderName: "Lukas Meier" } });
+    // A skill that is not in the catalogue is not taken over, whatever the AI says.
+    if (body.fileName === "diving.pdf") return route.fulfill({ json: { ...read, skill: "Diving" } });
+    return route.fulfill({ json: read });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Additional Options" }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+
+  const pdf = (name: string) => ({ name, mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 test") });
+  await page.locator("ui5-file-uploader input[type=file][multiple]").setInputFiles(["conti.pdf", "stranger.pdf", "diving.pdf", "torn.pdf"].map(pdf));
+
+  // The AI gets the file and the names of the skills, and nothing about persons.
+  await expect(page.getByText("Person, skill and dates were read by AI.")).toBeVisible();
+  expect(sent).toEqual(["conti.pdf", "stranger.pdf", "diving.pdf", "torn.pdf"].map((fileName) => ({ fileName, skills: ["First Aid", "Welding"] })));
+  await expect(page.getByText("No technician with this name.")).toBeVisible();
+  await expect(page.getByText("The certificate fits no skill of the catalogue.")).toBeVisible();
+  await expect(page.getByText("The certificate could not be read.")).toBeVisible();
+
+  const before = calls.length;
+  await page.getByRole("button", { name: "Import 1 assignment" }).click();
+  await expect(page.getByText("1 assignment imported.")).toBeVisible();
+  const written = calls.slice(before);
+  expect(written.find((call) => call.path === "skill/v2/skills")?.body).toMatchObject([
+    { tagId: "T1", technician: "P3", startDate: "2026-03-01", endDate: "2030-12-31" },
+  ]);
+  expect(written.find((call) => call.path === "data/v4/Attachment")?.body).toMatchObject({
+    fileName: "conti.pdf",
+    type: "PDF",
+    object: { objectType: "SKILL" },
+  });
 });
 
 test("a click on a person lists the skills, opens a certificate and offers the export", async ({ page }) => {

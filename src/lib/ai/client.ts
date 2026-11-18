@@ -1,6 +1,6 @@
 // Browser side of the AI features. The key never leaves the server.
 import { existingSkill, type CertificateFacts } from "@/lib/domain/certificate-facts";
-import { columnsFromHeaders, type ColumnMap, type ImportField } from "@/lib/domain/import";
+import { columnsFromHeaders, type CertificateRead, type ColumnMap, type ImportField } from "@/lib/domain/import";
 import type { QuestionAnswer } from "@/lib/domain/question";
 import { fileToBase64 } from "@/lib/fsm/client";
 import { UserError, type MessageKey } from "@/lib/i18n/translate";
@@ -32,6 +32,14 @@ async function post<T>(path: string, body: unknown, fallback: MessageKey): Promi
 // The skill name is sent with the file, so the AI can say whether the certificate is for it.
 export async function readCertificateFacts(file: File, skill?: string): Promise<CertificateFacts> {
   return post("/api/ai/certificate", { fileName: file.name, base64: await fileToBase64(file), skill }, "ai.certificateNotRead");
+}
+
+// For the import: the file goes with the names of the skills, and the AI names the one it is for.
+// Only a name that is in the catalogue counts.
+export async function readCertificateForImport(file: File, skills: string[]): Promise<CertificateRead> {
+  const body = { fileName: file.name, base64: await fileToBase64(file), skills };
+  const answer = await post<Omit<CertificateRead, "fileName">>("/api/ai/certificate", body, "ai.certificateNotRead");
+  return { ...answer, fileName: file.name, skill: existingSkill(answer.skill, skills) };
 }
 
 // Asks whether a new skill name means the same as an existing one. Only skill names are sent.

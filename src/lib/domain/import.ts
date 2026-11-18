@@ -97,6 +97,23 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// Certificates read for an import: what the AI found on one file. A field it did not find is null.
+export const MAX_IMPORT_CERTIFICATES = 10;
+export interface CertificateRead {
+  fileName: string;
+  holderName: string | null;
+  skill: string | null;
+  validFrom: string | null;
+  validTo: string | null;
+}
+export const CERTIFICATE_COLUMNS: ColumnMap = { person: 0, skill: 1, level: null, validFrom: 2, validTo: 3 };
+
+// One row per certificate in the shape of a sheet, so the checks of a file apply to it as well.
+// The file name keeps a row in place when nothing else was read.
+export function certificateRows(reads: CertificateRead[]): string[][] {
+  return reads.map((read) => [read.holderName ?? "", read.skill ?? "", read.validFrom ?? "", read.validTo ?? "", read.fileName]);
+}
+
 export const isEmptyRow = (row: unknown[]) => row.every((cell) => String(cell ?? "").trim() === "");
 
 // An empty cell is "no date". A date cell of a spreadsheet, 31.12.2027 and 2027-12-31 are
