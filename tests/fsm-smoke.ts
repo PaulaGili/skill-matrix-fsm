@@ -94,8 +94,10 @@ run(async () => {
     // Retire: assignments valid today end yesterday, or today when they started today.
     // The one that starts later is removed. Certificates stay.
     await createAssignment(skill.id, employees[2].id, { levelId: basic.id, startDate: addDays(todayIso(), 10), endDate: null });
+    const levelsBefore = new Map((await listAssignments()).filter((a) => a.skillId === skill.id).map((a) => [a.id, a.levelId]));
     await retireSkill(skill.id);
     const retired = (await listAssignments()).filter((a) => a.skillId === skill.id);
+    for (const a of retired) assert.equal(a.levelId, levelsBefore.get(a.id), "retiring keeps the level");
     assert.deepEqual(
       new Map(retired.map((a) => [a.id, a.endDate])),
       new Map([

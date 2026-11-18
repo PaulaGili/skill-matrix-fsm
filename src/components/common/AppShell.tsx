@@ -10,12 +10,14 @@ import {
   ShellBar,
   ShellBarBranding,
   ShellBarItem,
+  ShellBarSpacer,
   Tab,
   TabContainer,
 } from "@ui5/webcomponents-react";
 import { HelpDialog } from "./HelpDialog";
 import { DEMO_MODE } from "@/lib/demo/mode";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { readStored, store } from "@/lib/storage";
 import type { Language } from "@/lib/i18n/translate";
 import styles from "./AppShell.module.css";
 
@@ -55,16 +57,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   // The larger size is the default, as it is easier to read and to hit. The compact size
   // shows more rows and is remembered in this browser for those who choose it.
   useEffect(() => {
-    try {
-      document.body.toggleAttribute("data-ui5-compact-size", localStorage.getItem(COMPACT_KEY) === "1");
-    } catch {}
+    document.body.toggleAttribute("data-ui5-compact-size", readStored(COMPACT_KEY) === "1");
   }, []);
 
   function toggleSize() {
-    const compact = document.body.toggleAttribute("data-ui5-compact-size");
-    try {
-      localStorage.setItem(COMPACT_KEY, compact ? "1" : "0");
-    } catch {}
+    store(COMPACT_KEY, document.body.toggleAttribute("data-ui5-compact-size") ? "1" : "0");
   }
 
   // The bar names the connection only when it is not the normal one. The help names the company.
@@ -90,17 +87,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           </ShellBarBranding>
         }
         secondaryTitle={connection}
-        assistant={
-          <SegmentedButton
-            accessibleName={t("shell.language")}
-            onSelectionChange={(event) => setLanguage(event.detail.selectedItems[0].dataset.language as Language)}
-          >
-            {LANGUAGES.map((code) => (
-              <SegmentedButtonItem key={code} data-language={code} selected={code === language}>
-                {code.toUpperCase()}
-              </SegmentedButtonItem>
-            ))}
-          </SegmentedButton>
+        content={
+          <>
+            <ShellBarSpacer />
+            <SegmentedButton
+              accessibleName={t("shell.language")}
+              onSelectionChange={(event) => setLanguage(event.detail.selectedItems[0].dataset.language as Language)}
+            >
+              {LANGUAGES.map((code) => (
+                <SegmentedButtonItem key={code} data-language={code} selected={code === language}>
+                  {code.toUpperCase()}
+                </SegmentedButtonItem>
+              ))}
+            </SegmentedButton>
+          </>
         }
       >
         <ShellBarItem icon="resize" text={t("shell.size")} onClick={toggleSize} />

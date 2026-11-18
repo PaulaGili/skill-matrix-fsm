@@ -17,6 +17,10 @@ describe("toUserMessage", () => {
     expect(toUserMessage(new FsmError("CA-27: Resource concurrent modification detected", 409), en)).toMatch(/Someone else changed/);
   });
 
+  it("explains a file that the hosting platform cut off", () => {
+    expect(toUserMessage(new FsmError("Request Entity Too Large", 413), en)).toMatch(/too large for this server/);
+  });
+
   it("explains a failed network request", () => {
     expect(toUserMessage(new TypeError("Failed to fetch"), en)).toMatch(/not reachable/);
     expect(toUserMessage(new TypeError("Failed to fetch"), de)).toMatch(/nicht erreichbar/);

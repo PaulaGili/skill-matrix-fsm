@@ -2,22 +2,8 @@
 
 import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
-import {
-  Button,
-  FilterBar,
-  FilterGroupItem,
-  Icon,
-  IllustratedMessage,
-  Input,
-  MessageStrip,
-  Table,
-  TableCell,
-  TableHeaderCell,
-  TableHeaderRow,
-  TableRow,
-  Text,
-  Title,
-} from "@ui5/webcomponents-react";
+import { Button, IllustratedMessage, MessageStrip, Table, TableCell, TableHeaderCell, TableHeaderRow, TableRow, Text, Title } from "@ui5/webcomponents-react";
+import { PageFilters, searchFilter } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { PageToolbar } from "@/components/common/PageToolbar";
 import { useSort, type SortColumn } from "@/components/common/useSort";
@@ -34,7 +20,6 @@ import { useI18n } from "@/lib/i18n/I18nProvider";
 // is loaded after the page is shown.
 const readChanges = async () => loadChanges();
 
-// The changes made in this browser, with Undo for the latest change of each assignment.
 const SORT_COLUMNS: SortColumn[] = [
   { key: "when", label: "history.when" },
   { key: "person", label: "field.person" },
@@ -42,6 +27,7 @@ const SORT_COLUMNS: SortColumn[] = [
   { key: "change", label: "history.change" },
 ];
 
+// The changes made in this browser, with Undo for the latest change of each assignment.
 export function HistoryList() {
   const { data, reload } = useAsyncData(readChanges);
   const changes = data ?? [];
@@ -110,26 +96,9 @@ export function HistoryList() {
           sorting={{ columns: SORT_COLUMNS, sort }}
         />
       </div>
-      <FilterBar
-        className={shell.filterBar}
-        filterContainerWidth="13rem"
-        hideFilterConfiguration
-        hideToggleFiltersButton
-        hideToolbar
-        showClearOnFB={search !== ""}
-        onClear={() => setSearch("")}
-      >
-        <FilterGroupItem filterKey="person" label={t("field.person")}>
-          <Input
-            placeholder={t("filter.searchPerson")}
-            accessibleName={t("filter.searchPerson")}
-            showClearIcon
-            icon={<Icon name="search" />}
-            value={search}
-            onInput={(event) => setSearch(event.target.value)}
-          />
-        </FilterGroupItem>
-      </FilterBar>
+      <PageFilters active={search !== ""} onClear={() => setSearch("")}>
+        {searchFilter({ filterKey: "person", label: t("field.person"), placeholder: t("filter.searchPerson"), value: search, onChange: setSearch })}
+      </PageFilters>
       {error && (
         <MessageStrip design="Negative" onClose={() => setError(null)}>
           {error}
@@ -140,6 +109,7 @@ export function HistoryList() {
         <IllustratedMessage name="NoEntries" titleText={t("history.emptyTitle")} subtitleText={t("history.emptyText")} />
       ) : (
         <Table
+          noDataText={t("history.noMatch")}
           accessibleName={t("nav.history")}
           overflowMode="Popin"
           headerRow={

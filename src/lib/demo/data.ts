@@ -1,7 +1,7 @@
-// Sample data for demo mode: invented persons, five skills and one assignment per status.
+// Sample data for demo mode: invented persons, five skills and assignments that cover every status.
 // Dates are relative to today, so the statuses stay meaningful whenever the demo is opened.
 import { NAME_PREFIX } from "@/lib/candidate";
-import { addDays, todayIso } from "@/lib/domain/status";
+import { OPEN_END_DATE, addDays, todayIso } from "@/lib/domain/status";
 
 const NAMES = ["Anna Aerni", "Beat Baumann", "Carla Conti", "David Dubois", "Elena Egger", "Fabio Ferrari", "Greta Gerber", "Hans Hofer"];
 const SKILLS = ["Electrical Switching", "First Aid", "Gas Engines", "Welding", "Working at Heights"];
@@ -37,7 +37,7 @@ export function demoData() {
     tagName: NAME_PREFIX + SKILLS[skill],
     technicianId: `P${person}`,
     startDate: addDays(today, start),
-    endDate: end === null ? "9999-12-31" : addDays(today, end),
+    endDate: end === null ? OPEN_END_DATE : addDays(today, end),
     proficiencyId: `L${level}`,
     proficiencyName: LEVELS[level - 1],
     proficiencyLevel: level,

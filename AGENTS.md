@@ -9,7 +9,7 @@
 
 ## Project conventions
 
-- Layers: UI (`src/components`, `src/app`) -> hooks (`src/hooks`) -> FSM services (`src/lib/fsm/services`) -> proxy. Pure rules live in `src/lib/domain` and have no FSM or React imports.
+- Layers: UI (`src/components`, `src/app`) -> FSM services (`src/lib/fsm/services`) -> proxy. Components call the services; reads go through `useAsyncData` (`src/hooks`), which holds loading, error and reload. Pure rules live in `src/lib/domain` and have no FSM or React imports.
 - Names follow the assignment: Skill (FSM Tag), Assignment (FSM Skill), Certificate (FSM Attachment), Level (FSM Proficiency). Only the services know the FSM names.
 - Every update and delete goes through a service function that takes an id and re-reads the record from FSM before writing (`requireOwnSkill`, `requireOwnAssignments`). Do not call `skillApi` or `fsmDelete` for writes from anywhere else.
 - Dates are `yyyy-MM-dd` strings. Do not parse them with `new Date(string)`; use the helpers in `src/lib/domain/status.ts`.

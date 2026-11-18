@@ -1,26 +1,19 @@
-// npm run eval:ai: runs both AI features against the real AI service and compares the
-// answers with known ones: five invented certificates, six questions about the matrix and six new skill names.
-// Needs ANTHROPIC_API_KEY in .env.local and costs a few cents.
-import { readFileSync } from "node:fs";
+// npm run eval:ai [-- runs [certificate model]]: asks the real AI service known cases and
+// compares what the app would do with each answer. Needs ANTHROPIC_API_KEY in .env.local.
+// The result is written to last-run.txt. See "Evaluating the AI features" in docs/decisions.md.
+import { readFileSync, writeFileSync } from "node:fs";
+import { matchColumns } from "@/lib/ai/import-columns";
 import { questionToAnswer } from "@/lib/ai/question";
 import { readCertificate } from "@/lib/ai/read-certificate";
-import { matchColumns } from "@/lib/ai/import-columns";
+import { MODEL } from "@/lib/ai/server";
 import { similarSkill } from "@/lib/ai/similar-skill";
 import { checkCertificateFile } from "@/lib/domain/certificate";
 import { existingSkill } from "@/lib/domain/certificate-facts";
+import { IMPORT_FIELDS, columnsFromHeaders, guessColumns, unusedColumns, withProposed } from "@/lib/domain/import";
 import { toFilters } from "@/lib/domain/question";
 
-interface Expected {
-  file: string;
-  skill: string;
-  forSkill: string;
-  holderName: string | null;
-  validFrom: string | null;
-  validTo: string | null;
-}
-
-const FIELDS = ["holderName", "validFrom", "validTo", "forSkill"] as const;
-const same = (a: string | null, b: string | null) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+const RUNS = Number(process.argv[2] ?? 1);
+const CERTIFICATE_MODEL = process.argv[3] ?? MODEL;
 
 const SKILLS = [
   { id: "s1", name: "Welding" },
@@ -29,114 +22,123 @@ const SKILLS = [
   { id: "s4", name: "Electrical Switching" },
   { id: "s5", name: "Gas Engines" },
 ];
+const SKILL_NAMES = SKILLS.map((skill) => skill.name);
 const LEVELS = ["Basic", "Advanced", "Expert"];
 
-interface ExpectedFilters {
+const lines: string[] = [];
+function say(line = "") {
+  console.log(line);
+  lines.push(line);
+}
+
+const load = <Case>(file: string): Case[] => JSON.parse(readFileSync(`tests/ai-eval/${file}`, "utf8"));
+const sorted = (values: readonly string[]) => [...values].sort().join(", ");
+// One problem line when the two differ, none when they are the same.
+const differs = (field: string, expected: string | null, got: string | null) =>
+  (expected ?? "").toLowerCase() === (got ?? "").toLowerCase() ? [] : [`${field}: expected ${expected}, got ${got}`];
+
+// Asks every case RUNS times. The same input can get a different answer the next time, so a
+// case counts only when no run has a problem. An error of the service is a problem too.
+async function score<Case>(title: string, cases: Case[], nameOf: (c: Case) => string, problemsOf: (c: Case) => Promise<string[]>): Promise<boolean> {
+  say(`\n${title}`);
+  const started = Date.now();
+  let correct = 0;
+  for (const c of cases) {
+    const problems = new Set<string>();
+    let passed = 0;
+    for (let run = 0; run < RUNS; run++) {
+      const found = await problemsOf(c).catch((error) => [`error: ${error instanceof Error ? error.message : String(error)}`]);
+      if (found.length === 0) passed++;
+      for (const problem of found) problems.add(problem);
+    }
+    if (passed === RUNS) correct++;
+    say(`${passed === RUNS ? "ok  " : "FAIL"} ${passed}/${RUNS} ${nameOf(c)}`);
+    for (const problem of problems) say(`       ${problem}`);
+  }
+  const seconds = (Date.now() - started) / 1000 / (cases.length * RUNS);
+  say(`${correct} of ${cases.length} correct, ${seconds.toFixed(1)} s per call`);
+  return correct === cases.length;
+}
+
+interface Certificate {
+  file: string;
+  skill: string;
+  forSkill: string;
+  holderName: string | null;
+  validFrom: string | null;
+  validTo: string | null;
+}
+
+// Every field of the certificate must match: holder, both dates, and whether it is for the skill.
+async function certificateProblems(expected: Certificate): Promise<string[]> {
+  const file = readFileSync(`tests/ai-eval/cases/${expected.file}`);
+  const check = checkCertificateFile(expected.file, file.length);
+  if (!check.ok) return [check.error.key];
+  const facts = await readCertificate(check.type, file.toString("base64"), expected.skill, CERTIFICATE_MODEL);
+  return (["holderName", "validFrom", "validTo", "forSkill"] as const).flatMap((field) => differs(field, expected[field], facts[field]));
+}
+
+interface Question {
   question: string;
+  search?: string; // part of a person's name the search must hold; without it the search must stay empty
   skills: string[];
   statuses: string[];
   levels: string[];
 }
 
-// Certificates: every field must match the known answer.
-async function evalCertificates(): Promise<[number, number]> {
-  const cases: Expected[] = JSON.parse(readFileSync("tests/ai-eval/expected.json", "utf8"));
-  let correct = 0;
-  for (const expected of cases) {
-    const file = readFileSync(`tests/ai-eval/cases/${expected.file}`);
-    const check = checkCertificateFile(expected.file, file.length);
-    if (!check.ok) throw new Error(`${expected.file}: ${check.error.key}`);
-
-    const started = Date.now();
-    const facts = await readCertificate(check.type, file.toString("base64"), expected.skill);
-    const wrong = FIELDS.filter((field) => !same(facts[field], expected[field]));
-    correct += FIELDS.length - wrong.length;
-
-    const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    console.log(`${wrong.length === 0 ? "ok  " : "FAIL"} ${expected.file} (${seconds}s)`);
-    for (const field of wrong) console.log(`       ${field}: expected ${expected[field]}, got ${facts[field]}`);
-  }
-  return [correct, cases.length * FIELDS.length];
+// The filters the matrix would get. A filter that is not set counts as empty.
+async function questionProblems(expected: Question): Promise<string[]> {
+  const { filters } = toFilters(await questionToAnswer(expected.question, SKILL_NAMES, LEVELS), SKILLS, LEVELS);
+  const skills = (filters?.skillIds ?? []).map((id) => SKILLS.find((skill) => skill.id === id)!.name);
+  const search = filters?.search ?? "";
+  const searchOk = expected.search ? search.toLowerCase().includes(expected.search.toLowerCase()) : search === "";
+  return [
+    ...differs("skills", sorted(expected.skills), sorted(skills)),
+    ...differs("statuses", sorted(expected.statuses), sorted(filters?.statuses ?? [])),
+    ...differs("levels", sorted(expected.levels), sorted(filters?.levels ?? [])),
+    ...(searchOk ? [] : [`search: expected ${expected.search ? `"${expected.search}"` : "nothing"}, got "${search}"`]),
+  ];
 }
 
-// The same question can get a different answer the next time, so each one is asked RUNS
-// times (npm run eval:ai -- 3). The filters the app would set must match every time.
-const RUNS = Number(process.argv[2] ?? 1);
-
-async function evalQuestions(): Promise<[number, number]> {
-  const cases: ExpectedFilters[] = JSON.parse(readFileSync("tests/ai-eval/questions.json", "utf8"));
-  const sorted = (values: string[]) => [...values].sort().join(", ");
-  let correct = 0;
-  for (const expected of cases) {
-    let passed = 0;
-    const problems = new Set<string>();
-    for (let run = 0; run < RUNS; run++) {
-      const { filters } = toFilters(
-        await questionToAnswer(
-          expected.question,
-          SKILLS.map((skill) => skill.name),
-          LEVELS,
-        ),
-        SKILLS,
-        LEVELS,
-      );
-      const got = {
-        skills: (filters?.skillIds ?? []).map((id) => SKILLS.find((skill) => skill.id === id)!.name),
-        statuses: filters?.statuses ?? [],
-        levels: filters?.levels ?? [],
-      };
-      const wrong = (["skills", "statuses", "levels"] as const).filter((field) => sorted(got[field]) !== sorted(expected[field]));
-      if (wrong.length === 0) passed++;
-      for (const field of wrong) problems.add(`${field}: expected [${sorted(expected[field])}], got [${sorted(got[field])}]`);
-    }
-    if (passed === RUNS) correct++;
-    console.log(`${passed === RUNS ? "ok  " : "FAIL"} ${passed}/${RUNS} "${expected.question}"`);
-    for (const problem of problems) console.log(`       ${problem}`);
-  }
-  return [correct, cases.length];
+// The skill the dialog would warn about, or none.
+async function similarProblems(expected: { name: string; similar: string | null }): Promise<string[]> {
+  return differs("similar", expected.similar, existingSkill(await similarSkill(expected.name, SKILL_NAMES), SKILL_NAMES));
 }
 
-// New skill names: the existing skill that means the same, or none.
-async function evalSimilarSkills(): Promise<[number, number]> {
-  const cases: { name: string; similar: string | null }[] = JSON.parse(readFileSync("tests/ai-eval/similar-skills.json", "utf8"));
-  const existing = SKILLS.map((skill) => skill.name);
-  let correct = 0;
-  for (const expected of cases) {
-    const answers = new Set<string | null>();
-    for (let run = 0; run < RUNS; run++) answers.add(existingSkill(await similarSkill(expected.name, existing), existing));
-    const passed = answers.size === 1 && answers.has(expected.similar);
-    if (passed) correct++;
-    console.log(`${passed ? "ok  " : "FAIL"} "${expected.name}"${passed ? "" : `: expected ${expected.similar}, got ${[...answers].join(" / ")}`}`);
-  }
-  return [correct, cases.length];
+interface Sheet {
+  headers: string[];
+  columns: Record<string, string | null>;
 }
 
-// Column titles of an import file: which title holds which field.
-async function evalImportColumns(): Promise<[number, number]> {
-  const cases: { headers: string[]; columns: Record<string, string | null> }[] = JSON.parse(readFileSync("tests/ai-eval/import-columns.json", "utf8"));
-  let correct = 0;
-  for (const expected of cases) {
-    let passed = 0;
-    for (let run = 0; run < RUNS; run++) {
-      const answer: Record<string, string | null> = await matchColumns(expected.headers);
-      if (Object.keys(expected.columns).every((field) => answer[field] === expected.columns[field])) passed++;
-    }
-    if (passed === RUNS) correct++;
-    console.log(`${passed === RUNS ? "ok  " : "FAIL"} ${passed}/${RUNS} ${expected.headers.join(", ")}`);
-  }
-  return [correct, cases.length];
+// The columns the import would use: the code first, then the AI for the titles left over,
+// exactly as the import dialog does it.
+async function columnProblems(expected: Sheet): Promise<string[]> {
+  const byCode = guessColumns(expected.headers);
+  const left = unusedColumns(expected.headers, byCode);
+  const titles = left.map((column) => expected.headers[column]);
+  const askAi = titles.length > 0 && Object.values(byCode).includes(null);
+  const columns = askAi ? withProposed(byCode, columnsFromHeaders(await matchColumns(titles), titles), left) : byCode;
+  return IMPORT_FIELDS.flatMap((field) => {
+    const column = columns[field];
+    return differs(field, expected.columns[field], column === null ? null : expected.headers[column]);
+  });
 }
 
 async function main() {
-  const [fields, allFields] = await evalCertificates();
-  console.log(`${fields} of ${allFields} certificate fields correct\n`);
-  const [questions, allQuestions] = await evalQuestions();
-  console.log(`${questions} of ${allQuestions} questions correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
-  const [names, allNames] = await evalSimilarSkills();
-  console.log(`\n${names} of ${allNames} skill names correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
-  const [sheets, allSheets] = await evalImportColumns();
-  console.log(`\n${sheets} of ${allSheets} import files correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
-  if (fields < allFields || questions < allQuestions || names < allNames || sheets < allSheets) process.exit(1);
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not set in .env.local.");
+  say(`AI evaluation, ${new Date().toISOString().slice(0, 10)}, each case ${RUNS} time${RUNS === 1 ? "" : "s"}`);
+  say(`Model: ${MODEL}${CERTIFICATE_MODEL === MODEL ? "" : `, certificates read with ${CERTIFICATE_MODEL}`}`);
+
+  const results = [
+    await score("Certificates", load<Certificate>("expected.json"), (c) => `${c.file} for ${c.skill}`, certificateProblems),
+    await score("Questions about the matrix", load<Question>("questions.json"), (c) => `"${c.question}"`, questionProblems),
+    await score("Similar skill names", load<{ name: string; similar: string | null }>("similar-skills.json"), (c) => `"${c.name}"`, similarProblems),
+    await score("Column titles of an import file", load<Sheet>("import-columns.json"), (c) => c.headers.join(", "), columnProblems),
+  ];
+  const passed = results.every(Boolean);
+  say(`\n${passed ? "PASSED" : "FAILED"}`);
+  writeFileSync("tests/ai-eval/last-run.txt", `${lines.join("\n")}\n`);
+  if (!passed) process.exit(1);
 }
 
 main().catch((error) => {

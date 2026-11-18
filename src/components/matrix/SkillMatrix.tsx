@@ -23,8 +23,8 @@ import { PageToolbar } from "@/components/common/PageToolbar";
 import { useSort, type SortColumn } from "@/components/common/useSort";
 import { LoadError, Loading } from "@/components/common/LoadState";
 import { useToast } from "@/components/common/useToast";
+import { useAiEnabled } from "@/hooks/useAiEnabled";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { isAiEnabled } from "@/lib/ai/client";
 import {
   HELD_TODAY,
   buildCells,
@@ -37,6 +37,7 @@ import {
   skillsWithMatches,
   sortRank,
   type CellFilter,
+  levelNamesOf,
 } from "@/lib/domain/matrix";
 import { matrixTable } from "@/lib/domain/export";
 import { todayIso } from "@/lib/domain/status";
@@ -46,19 +47,10 @@ import { useI18n } from "@/lib/i18n/I18nProvider";
 import { AskMatrix } from "./AskMatrix";
 import { MatrixCell } from "./MatrixCell";
 import { MatrixFilters } from "./MatrixFilters";
+import { useColumnOrder } from "./useColumnOrder";
 import styles from "./SkillMatrix.module.css";
 
 const VISIBLE_ROWS = 15;
-const COLUMN_ORDER_KEY = "matrix:columnOrder";
-function loadColumnOrder(): string[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
-    return Array.isArray(stored) ? stored : [];
-  } catch {
-    return [];
-  }
-}
-
 // Keeps the person column in place while the skills scroll sideways. Despite its name this
 // is a table plugin factory, not a React hook, so it is created once outside the component.
 const { useStickyColumns: stickyColumns } = AnalyticalTableHooks;
@@ -77,7 +69,7 @@ export function SkillMatrix() {
   const [importing, setImporting] = useState(false);
   const [shownPerson, setShownPerson] = useState<Person | null>(null);
   const { toastElement, showToast } = useToast();
-  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const aiEnabled = useAiEnabled();
   const { t } = useI18n();
   const today = todayIso();
 
@@ -99,32 +91,11 @@ export function SkillMatrix() {
   );
   const selectedSkills = useMemo(() => filterSkills(data?.skills ?? [], skillIds), [data, skillIds]);
 
-  const levelNames = useMemo(() => {
-    const byName = new Map((data?.assignments ?? []).filter((a) => a.levelName).map((a) => [a.levelName!, a.level ?? 0]));
-    return [...byName.keys()].sort((a, b) => byName.get(a)! - byName.get(b)!);
-  }, [data]);
+  const levelNames = useMemo(() => levelNamesOf(data?.assignments ?? []), [data]);
 
   const filters = useMemo(() => ({ statuses: statusFilters, levels }), [statusFilters, levels]);
 
-  // The order of the skill columns after dragging them, remembered in this browser.
-  const [columnOrder, setColumnOrder] = useState<string[]>(loadColumnOrder);
-  function saveColumnOrder(order: string[]) {
-    setColumnOrder(order);
-    try {
-      localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
-    } catch {}
-  }
-
-  // The dragged skill takes the place of the one it is dropped on. The table's own result
-  // is not used: dropped to the right it puts the column back where it was.
-  function moveColumn(draggedId: string, droppedId: string) {
-    const order = inColumnOrder(data?.skills ?? [], columnOrder).map((skill) => skill.id);
-    const from = order.indexOf(draggedId);
-    const to = order.indexOf(droppedId);
-    if (from === -1 || to === -1) return;
-    order.splice(to, 0, order.splice(from, 1)[0]);
-    saveColumnOrder(order);
-  }
+  const { columnOrder, moveColumn } = useColumnOrder(data?.skills ?? []);
 
   const searched = useMemo(() => filterPersons(data?.persons ?? [], search, showSystemUsers), [data, search, showSystemUsers]);
 
@@ -294,8 +265,6 @@ export function SkillMatrix() {
               const drop = event as unknown as DragEvent;
               moveColumn(drop.dataTransfer?.getData("text") ?? "", (drop.currentTarget as HTMLElement).dataset.columnId ?? "");
             }}
-            filterable={false}
-            groupable={false}
             noDataText={t("matrix.noPersons")}
           />
         </>

@@ -5,6 +5,7 @@ import { Bar, Button, CheckBox, Dialog, Label, Option, RadioButton, Select } fro
 import { toCsv } from "@/lib/domain/export";
 import { todayIso } from "@/lib/domain/status";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { readStoredJson, store } from "@/lib/storage";
 import styles from "./ExportDialog.module.css";
 
 interface Props {
@@ -38,20 +39,9 @@ interface Choice {
 
 const DEFAULTS: Choice = { skipped: [], format: "xlsx", separator: "," };
 
-// The last choice is kept in the browser. If storage is not available, the defaults are used.
-function loadChoice(name: string): Choice {
-  try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(`export:${name}`) ?? "{}") };
-  } catch {
-    return DEFAULTS;
-  }
-}
-
-function saveChoice(name: string, choice: Choice) {
-  try {
-    localStorage.setItem(`export:${name}`, JSON.stringify(choice));
-  } catch {}
-}
+// The last choice is kept in the browser. Without one, the defaults are used.
+const loadChoice = (name: string): Choice => ({ ...DEFAULTS, ...(readStoredJson(`export:${name}`) as Partial<Choice> | null) });
+const saveChoice = (name: string, choice: Choice) => store(`export:${name}`, JSON.stringify(choice));
 
 // The export dialog and the function that opens it: choose the columns, then the format.
 export function useExport({ name, getRows, onError }: Props) {

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Bar, Button, Dialog, MessageStrip, Text } from "@ui5/webcomponents-react";
-import { useAsyncData } from "@/hooks/useAsyncData";
-import { isAiEnabled, readCertificateFacts } from "@/lib/ai/client";
+import { useAiEnabled } from "@/hooks/useAiEnabled";
+import { readCertificateFacts } from "@/lib/ai/client";
 import { checkFacts, type Suggestion } from "@/lib/domain/certificate-facts";
 import { formatDate, todayIso } from "@/lib/domain/status";
 import { fileToBase64 } from "@/lib/fsm/client";
@@ -44,7 +44,7 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [messages, setMessages] = useState<string[]>([]);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
-  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const aiEnabled = useAiEnabled();
   const [suggestion, setSuggestion] = useState<(Suggestion & { fileName: string }) | null>(null);
   const [busy, setBusy] = useState(false);
   const { t } = useI18n();
@@ -73,7 +73,11 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
     setMessages([]);
     try {
       const uploads = await Promise.all(newFiles.map(async (file) => ({ fileName: file.name, sizeBytes: file.size, base64: await fileToBase64(file) })));
-      const { saved: nowSaved, failures } = await saveAssignment(skill.id, person.id, saved, {
+      const {
+        saved: nowSaved,
+        failures,
+        notDeleted,
+      } = await saveAssignment(skill.id, person.id, saved, {
         input: toInput(fields),
         deleteCertificateIds: removedIds,
         uploads,
@@ -82,12 +86,16 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
       const after = { ...nowSaved, levelName: nowSaved.levelId ? (fields.levelName ?? nowSaved.levelName) : null };
       const changed = saved && (saved.levelId !== after.levelId || saved.startDate !== after.startDate || saved.endDate !== after.endDate);
       if (!saved || changed) record(saved ? "edited" : "assigned", saved, after);
-      if (failures.length === 0) return onSaved(t(saved ? "assignment.saved" : "assignment.assigned"));
+      if (failures.length === 0 && !notDeleted) return onSaved(t(saved ? "assignment.saved" : "assignment.assigned"));
 
-      // The assignment is saved, but some files were not uploaded. Keep those in the list.
+      // The assignment is saved, but some files were not uploaded or not deleted. Those stay
+      // in the list, so Save can be pressed again.
       setSaved(after);
-      setMessages(failures.map((failure) => `${failure.fileName}: ${toUserMessage(failure.error, t)}`));
-      setRemovedIds([]);
+      setMessages([
+        ...(notDeleted ? [toUserMessage(notDeleted, t)] : []),
+        ...failures.map((failure) => `${failure.fileName}: ${toUserMessage(failure.error, t)}`),
+      ]);
+      if (!notDeleted) setRemovedIds([]);
       setNewFiles(newFiles.filter((_, index) => failures.some((failure) => failure.index === index)));
     } catch (error) {
       setMessages([toUserMessage(error, t)]);

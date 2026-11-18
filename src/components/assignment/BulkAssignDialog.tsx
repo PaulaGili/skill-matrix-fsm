@@ -44,10 +44,7 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
     setBusy(true);
     setError(null);
     try {
-      const created = await createAssignments(
-        skillId,
-        personIds.map((personId) => ({ ...toInput(valuesOf(personId)), personId })),
-      );
+      const created = await createAssignments(personIds.map((personId) => ({ ...toInput(valuesOf(personId)), skillId, personId })));
       for (const assignment of created) {
         recordAssigned(skill.name, persons.find((person) => person.id === assignment.personId)?.displayName ?? "", assignment);
       }

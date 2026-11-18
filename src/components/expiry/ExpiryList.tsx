@@ -4,13 +4,8 @@ import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
   Button,
-  FilterBar,
   FilterGroupItem,
-  Icon,
   IllustratedMessage,
-  Input,
-  MultiComboBox,
-  MultiComboBoxItem,
   Option,
   Select,
   Table,
@@ -23,6 +18,7 @@ import {
 } from "@ui5/webcomponents-react";
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { CertificateDialog } from "@/components/assignment/CertificateDialog";
+import { PageFilters, pickFilter, searchFilter } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { PageToolbar } from "@/components/common/PageToolbar";
 import { LoadError, Loading } from "@/components/common/LoadState";
@@ -30,7 +26,7 @@ import { useSort, type SortColumn } from "@/components/common/useSort";
 import { useToast } from "@/components/common/useToast";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { alreadyExpired, daysUntil, dueText, expiringWithin } from "@/lib/domain/expiry";
-import { filterPersons, indexAssignments } from "@/lib/domain/matrix";
+import { filterPersons, indexAssignments, levelNamesOf } from "@/lib/domain/matrix";
 import { formatDate, todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Assignment, Person, Skill } from "@/lib/fsm/services/model";
@@ -94,7 +90,7 @@ export function ExpiryList() {
     const message = dueText(daysUntil(assignment.endDate!, today));
     return t(message.key, message.params);
   };
-  const levelNames = [...new Set(data.assignments.map((assignment) => assignment.levelName).filter((name) => name !== null))];
+  const levelNames = levelNamesOf(data.assignments);
 
   const exportRows = () => [
     [t("field.validTo"), t("expiry.ends"), t("field.person"), t("field.skill"), t("field.level"), t("field.certificate")],
@@ -124,13 +120,8 @@ export function ExpiryList() {
       </div>
       {error && <LoadError message={error} onRetry={reload} />}
 
-      <FilterBar
-        className={shell.filterBar}
-        filterContainerWidth="13rem"
-        hideFilterConfiguration
-        hideToggleFiltersButton
-        hideToolbar
-        showClearOnFB={search !== "" || skillIds.length > 0 || levels.length > 0 || certificateFilter.length > 0}
+      <PageFilters
+        active={search !== "" || skillIds.length > 0 || levels.length > 0 || certificateFilter.length > 0}
         onClear={() => {
           setSearch("");
           setSkillIds([]);
@@ -138,7 +129,7 @@ export function ExpiryList() {
           setCertificateFilter([]);
         }}
       >
-        <FilterGroupItem filterKey="period" label={t("expiry.period")}>
+        <FilterGroupItem filterKey="period" label={t("expiry.period")} className={shell.filterItem}>
           <Select id="expiry-window" accessibleName={t("expiry.period")} onChange={(event) => setDays(Number(event.detail.selectedOption.dataset.days))}>
             {WINDOWS.map((window) => (
               <Option key={window} data-days={window} selected={window === days}>
@@ -147,49 +138,35 @@ export function ExpiryList() {
             ))}
           </Select>
         </FilterGroupItem>
-        <FilterGroupItem filterKey="person" label={t("field.person")}>
-          <Input
-            placeholder={t("filter.searchPerson")}
-            accessibleName={t("filter.searchPerson")}
-            showClearIcon
-            icon={<Icon name="search" />}
-            value={search}
-            onInput={(event) => setSearch(event.target.value)}
-          />
-        </FilterGroupItem>
-        <FilterGroupItem filterKey="skills" label={t("field.skill")}>
-          <MultiComboBox
-            placeholder={t("filter.bySkills")}
-            accessibleName={t("filter.bySkills")}
-            onSelectionChange={(event) => setSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
-          >
-            {data.skills.map((s) => (
-              <MultiComboBoxItem key={s.id} text={s.name} data-id={s.id} selected={skillIds.includes(s.id)} />
-            ))}
-          </MultiComboBox>
-        </FilterGroupItem>
-        <FilterGroupItem filterKey="level" label={t("field.level")} hiddenInFilterBar={levelNames.length === 0}>
-          <MultiComboBox
-            placeholder={t("filter.byLevel")}
-            accessibleName={t("filter.byLevel")}
-            onSelectionChange={(event) => setLevels(event.detail.items.map((item) => item.text ?? ""))}
-          >
-            {levelNames.map((name) => (
-              <MultiComboBoxItem key={name} text={name} selected={levels.includes(name)} />
-            ))}
-          </MultiComboBox>
-        </FilterGroupItem>
-        <FilterGroupItem filterKey="certificate" label={t("field.certificate")}>
-          <MultiComboBox
-            placeholder={t("filter.byCertificate")}
-            accessibleName={t("filter.byCertificate")}
-            onSelectionChange={(event) => setCertificateFilter(event.detail.items.map((item) => item.dataset.value ?? ""))}
-          >
-            <MultiComboBoxItem text={t("filter.withCertificate")} data-value="with" selected={certificateFilter.includes("with")} />
-            <MultiComboBoxItem text={t("filter.noCertificate")} data-value="without" selected={certificateFilter.includes("without")} />
-          </MultiComboBox>
-        </FilterGroupItem>
-      </FilterBar>
+        {searchFilter({ filterKey: "person", label: t("field.person"), placeholder: t("filter.searchPerson"), value: search, onChange: setSearch })}
+        {pickFilter({
+          filterKey: "skills",
+          label: t("field.skill"),
+          placeholder: t("filter.bySkills"),
+          options: data.skills.map((s) => ({ key: s.id, text: s.name })),
+          selected: skillIds,
+          onChange: setSkillIds,
+        })}
+        {pickFilter({
+          filterKey: "level",
+          label: t("field.level"),
+          placeholder: t("filter.byLevel"),
+          options: levelNames.map((name) => ({ key: name, text: name })),
+          selected: levels,
+          onChange: setLevels,
+        })}
+        {pickFilter({
+          filterKey: "certificate",
+          label: t("field.certificate"),
+          placeholder: t("filter.byCertificate"),
+          options: [
+            { key: "with", text: t("filter.withCertificate") },
+            { key: "without", text: t("filter.noCertificate") },
+          ],
+          selected: certificateFilter,
+          onChange: setCertificateFilter,
+        })}
+      </PageFilters>
 
       {rows.length === 0 ? (
         <IllustratedMessage

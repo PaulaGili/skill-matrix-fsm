@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { setLanguage as setUi5Language } from "@ui5/webcomponents-base/dist/config/Language.js";
 import { translator, type Language, type Translate } from "./translate";
+import { readStored, store } from "@/lib/storage";
 
 const STORAGE_KEY = "language";
 
@@ -20,18 +21,14 @@ function subscribe(listener: () => void) {
 // The stored choice, or German when the browser language is German, otherwise English.
 function currentLanguage(): Language {
   if (chosen) return chosen;
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "de") return stored;
-  } catch {}
+  const stored = readStored(STORAGE_KEY);
+  if (stored === "en" || stored === "de") return stored;
   return navigator.language.toLowerCase().startsWith("de") ? "de" : "en";
 }
 
 function chooseLanguage(language: Language) {
   chosen = language;
-  try {
-    localStorage.setItem(STORAGE_KEY, language);
-  } catch {}
+  store(STORAGE_KEY, language);
   listeners.forEach((listener) => listener());
 }
 

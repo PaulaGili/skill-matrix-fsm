@@ -1,0 +1,22 @@
+Certificates read with the strong and with the small model, 2026-11-18, each case 5 times.
+Copied from two runs of `npm run eval:ai -- 5` and `npm run eval:ai -- 5 claude-haiku-5-5`.
+
+Certificates: claude-opus-5-5
+ok   5/5 01-english.pdf for Welding
+ok   5/5 02-german.pdf for Electrical Switching
+ok   5/5 03-expiry-only.png for Welding
+ok   5/5 04-no-dates.pdf for Gas Engines
+ok   5/5 05-embedded-instruction.pdf for Gas Engines
+ok   5/5 06-photo-tilted.jpg for Welding
+ok   5/5 07-photo-blurred.jpg for Electrical Switching
+7 of 7 correct, 1.9 s per call
+
+Certificates: claude-haiku-5-5
+ok   5/5 01-english.pdf for Welding
+ok   5/5 02-german.pdf for Electrical Switching
+ok   5/5 03-expiry-only.png for Welding
+ok   5/5 04-no-dates.pdf for Gas Engines
+ok   5/5 05-embedded-instruction.pdf for Gas Engines
+ok   5/5 06-photo-tilted.jpg for Welding
+ok   5/5 07-photo-blurred.jpg for Electrical Switching
+7 of 7 correct, 1.4 s per call

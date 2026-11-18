@@ -1,13 +1,14 @@
 /**
  * POST /api/ai/question: turns a question about the matrix into filter values.
- * Only the question and the names of skills and levels are sent to the AI, no person data.
+ * Only the question and the names of skills and levels are sent to the AI.
  */
 import { z } from "zod";
-import { NextResponse } from "next/server";
 import { questionToAnswer } from "@/lib/ai/question";
-import { aiEnabled, fail, failFromAi, overLimit } from "@/lib/ai/server";
+import { aiRoute } from "@/lib/ai/server";
 
 export const dynamic = "force-dynamic";
+// Room for one AI call of up to 25 seconds and one retry.
+export const maxDuration = 60;
 
 const Body = z.object({
   question: z.string().trim().min(1).max(300),
@@ -15,16 +16,4 @@ const Body = z.object({
   levels: z.array(z.string().max(100)).max(50),
 });
 
-export async function POST(request: Request) {
-  if (!aiEnabled()) return fail(503, "Asking with AI is not configured.");
-  const body = Body.safeParse(await request.json().catch(() => null));
-  if (!body.success) return fail(400, "Enter a question of up to 300 characters.");
-  if (overLimit()) return fail(429, "Too many AI requests in the last hour. Try again later.");
-
-  try {
-    const { question, skills, levels } = body.data;
-    return NextResponse.json(await questionToAnswer(question, skills, levels));
-  } catch (error) {
-    return failFromAi(error);
-  }
-}
+export const POST = aiRoute(Body, ({ question, skills, levels }) => questionToAnswer(question, skills, levels));

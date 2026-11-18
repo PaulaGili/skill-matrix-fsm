@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Bar, Button, Dialog, Input, Label, MessageStrip, TextArea } from "@ui5/webcomponents-react";
-import { useAsyncData } from "@/hooks/useAsyncData";
-import { findSimilarSkill, isAiEnabled } from "@/lib/ai/client";
+import { useRef, useState } from "react";
+import { Bar, Button, Dialog, Input, Label, MessageStrip, TextArea, type InputDomRef } from "@ui5/webcomponents-react";
+import { useAiEnabled } from "@/hooks/useAiEnabled";
+import { findSimilarSkill } from "@/lib/ai/client";
 import { toUserMessage } from "@/lib/fsm/errors";
 import type { Skill } from "@/lib/fsm/services/model";
 import { ensureLevelScale } from "@/lib/fsm/services/scale";
@@ -26,9 +26,10 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
   const [saving, setSaving] = useState(false);
   // With AI configured, a new name is checked once against the catalogue for a skill that
   // means the same. The user then decides.
-  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const aiEnabled = useAiEnabled();
   const [similar, setSimilar] = useState<string | null>(null);
   const [checkedName, setCheckedName] = useState("");
+  const nameInput = useRef<InputDomRef>(null);
   const { t } = useI18n();
 
   function validate(): string | null {
@@ -41,7 +42,8 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
     if (saving) return; // Enter pressed twice
     const error = validate();
     setNameError(error);
-    if (error) return;
+    // The message of a field shows while the field has the focus.
+    if (error) return nameInput.current?.focus();
 
     setSaving(true);
     setSaveError(null);
@@ -107,6 +109,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
         </Label>
         <Input
           id="skill-name"
+          ref={nameInput}
           value={name}
           maxlength={200}
           valueState={nameError ? "Negative" : "None"}
