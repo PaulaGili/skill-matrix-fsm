@@ -46,10 +46,10 @@ Deleting a skill in the catalogue:
 - Save writes in a fixed order: the assignment, certificates to delete, then new files. If a file fails, the others are still uploaded, the dialog stays open and names the file and the reason.
 - "Assign to several" gives one skill to several persons in one request, with the same level and either the same validity for everyone or dates per person. It only offers persons who do not have the skill yet and stops at 20 persons, because the shared company allows no bulk imports beyond a few dozen records.
 - Files are checked twice: when they are picked (type and 5 MB limit) and again in the service before upload.
-- A certificate can be previewed inside the dialog. FSM serves attachments as downloads, so the file is fetched and shown from memory instead of pointing an iframe at the URL.
+- A certificate opens in a viewer dialog, the same one from the assignment, the person view, the skill view and the expiry list. FSM serves attachments as downloads, so the file is fetched and shown from memory instead of pointing an iframe at the URL.
 - FSM silently ignores a new end date on an open-ended skill (it answers 200 and keeps `9999-12-31`) unless `validityType` changes with it: `LF` for a date range, `PE` for no end date. `updateAssignment` always sends both. The smoke test covers both directions.
 
-- FSM gives a new skill the default level of its scale, even when no level is sent. Choosing "No level" therefore creates the skill and then clears the level with a second call. If that second call fails, the assignment keeps the default level and the matrix shows it, which is what FSM holds. The smoke test covers the normal case.
+- FSM gives a new skill the first level of its scale, whatever is sent: leaving the level out, sending `null`, a bulk update and a scale without a default level were all tried against the real company. Choosing "No level" therefore creates the skill and then clears the level with a second call per skill; for several persons these calls run together. If that second call fails, the assignment keeps the default level and the matrix shows it, which is what FSM holds. The smoke test covers the normal case.
 
 ## Concurrent edits
 
@@ -57,40 +57,45 @@ Before an update the service re-reads the assignment, which it does anyway for t
 
 The Data API has its own optimistic lock: a `PATCH` on `Skill` without `forceUpdate` and with a stale `lastChanged` fails with `409 CA-27`. It is stricter (no gap between check and write), but the level can only be written through the Skill Service, which has no such check, so one edit would need two APIs and could be saved halfway. The chosen check costs no extra call and covers dates and level together; a small window between the read and the write remains.
 
+## My skills
+
+- The optional self-service view is a page of its own: a technician picks the own name and sees the own skills, their validity and the certificates, read-only. It shows the same table as the person view of the matrix.
+- The app has no login, so the name is chosen once and remembered in the browser. With a login the person would come from the FSM user, and the page would not offer the other names.
+
 ## Proficiency scale
 
 One scale, `paulagili::Levels` (Basic, Advanced, Expert), found by exact name and created only if missing. Loading the matrix only reads it. `cleanup` deletes every scale with that name.
 
 ## Persons
 
-Every active person exists twice in the demo company, once as `EMPLOYEE` and once as `ERPUSER`, with the same name, and one technical person has no name. The matrix shows technicians (named employees) by default, and a switch adds the system users. All of them stay reachable, as the assignment asks for active persons, but the default view cannot assign a skill to the wrong twin.
+Every active person exists twice in the demo company, once as `EMPLOYEE` and once as `ERPUSER`, with the same name, and one technical person has no name. The matrix shows technicians (named employees) by default, and an entry in the overflow menu of the toolbar adds the system users. All of them stay reachable, as the assignment asks for active persons, but the default view cannot assign a skill to the wrong twin.
 
 ## Matrix
 
 - `AnalyticalTable` with the person column pinned, so names stay visible while the skills scroll sideways. The pinning plugin is marked experimental in UI5 Web Components for React 2.27, so it was tried first in a spike with all 26 persons: pinning, cell clicks and a narrow viewport all worked. A plain table with a CSS sticky column was the fallback.
-- A cell shows the standard status indicator (icon, colour and text) and a certificate icon on the first line, and the level and the date that matters on the second ("until 29.11.2026"). Unassigned cells show a dash to keep the grid quiet.
-- Filters: person search, skill selection, level selection, status buttons and the system-user switch. They combine by one rule, written as pure functions with unit tests:
+- A cell shows the standard status indicator (icon, colour and text) and a certificate icon on the first line, and the level and the date that matters on the second ("Expert - 29.11.2026"). The status says what the date means, and the full sentence is the tooltip. The short text lets seven skill columns fit a laptop screen.
+- Filters: person search, skill selection, level selection and status selection. System users are shown from the overflow menu of the toolbar. They combine by one rule, written as pure functions with unit tests:
   - Statuses are alternatives ("expired or expiring soon"), and so are levels. "No certificate" is a separate condition that must hold in the same cell, so "Valid" plus "No certificate" finds valid skills without proof.
   - With skills selected, a person needs a passing cell in every selected skill. Selecting the first skill switches on "Valid" and "Expiring soon", which answers "who can do Welding and First Aid today?". The default is visible and can be changed: "Welding" plus "Expired" shows whose welding has expired, and with all statuses off everyone is listed, which is the view for assigning the skill to someone new.
   - Without skills selected, one passing cell in any skill is enough, and the columns without a passing cell are hidden so the result is not a grid of dashes.
   - With a filter on, a cell that does not pass is left blank, so "No certificate" does not show the same person's certified skills next to the uncertified one.
-- The screen follows "overview first, then filter, then detail": a line above the table says how many assignments are expired, expiring soon or without a certificate among all technicians, and a click on a number sets that filter. All filters sit in one bar, and the status filters are toggle buttons.
+- The matrix page was reduced to one thing per row: one main action in a UI5 toolbar, with export, import, system users and refresh in its overflow menu; one bar with four filters of the same kind; then the table. An overview line with counts and a coloured stripe per row were tried and removed, as they repeated what the status filter and the Expiring page already say and made the page busy. Colour is used for the status only.
 - Cells of persons who do not have a skill are empty. A dash in every one of them made the least important thing the most visible; "Assign" appears when the pointer or the keyboard is on the cell.
 - The larger SAP size is the default, because the users are not all young and some work on a tablet. A button in the header switches to the compact size, with smaller fields and buttons, and the choice is remembered in the browser. The rows of the matrix keep their height, as a cell has two lines.
 - A click on a person opens a read-only list of all skills of that person with level, status, validity and certificates. It uses the data the matrix has already loaded, so it costs no FSM call.
-- A row starts with a red line when one of the shown skills of that person has expired, and an orange one when something expires soon.
-- The catalogue shows per skill how many assignments are expired, expiring soon, valid or not yet valid, in the colours of the matrix.
-- A click on a column header sorts the rows. A skill column puts the problems first (expired, expiring soon), then valid, then the persons without the skill. The skill columns can be dragged into another order, which is remembered in the browser.
+- Every page has the same frame: the title with the count, the actions at the end of that line (main action, Sort, overflow menu), one row of filters of the same width, then the table. Title, filters and table start at the same place on every page, so nothing jumps when the tab changes.
+- Each page answers one question. The catalogue shows per skill the number of assignments, and a click on a skill name lists who holds it; what expires is the question of the Expiring page and is not repeated in the catalogue. The Expiring page can also list what has already expired.
+- The list tables are sorted from a Sort button that opens the UI5 view settings dialog, and the filters sit in the UI5 filter bar, as in a Fiori list report. The matrix is sorted from the same Sort button. A skill column puts the problems first (expired, expiring soon), then valid, then the persons without the skill. The skill columns can be dragged into another order, which is remembered in the browser.
 - FSM allows two skills for the same person and tag. The app reads the assignments before it creates one and refuses a second one, so a retry or a second browser tab does not duplicate an assignment. Two saves in the same second could still both pass the check, as FSM itself has no such rule. If FSM holds two anyway, the cell shows the one that is valid today, and among equals the one that stays valid longest.
-- The "Expiring" page lists what ends within the next 30, 60, 90 or 180 days, soonest first, from the same four calls as the matrix. A row opens the same dialog as a matrix cell, so an assignment can be renewed where the problem is seen. Expired assignments are not listed there; the matrix filter covers them. It has the same person, skill, level and missing-certificate filters as the matrix and can be exported the same way.
-- Export downloads the matrix as it is shown, with the active filters, as Excel or CSV. The columns and the CSV separator can be chosen first, and the choice is remembered in the browser. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
+- The "Expiring" page lists what ends within the next 30, 60, 90 or 180 days, soonest first, from the same four calls as the matrix. A row opens the same dialog as a matrix cell, so an assignment can be renewed where the problem is seen. It can also list what has already expired, latest first. It has person, skill, level and certificate filters of the same kind as the matrix and can be exported the same way.
+- Export downloads the matrix with the active filters and the column order shown, the rows in name order, as Excel or CSV. The columns and the CSV separator can be chosen first, and the choice is remembered in the browser. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
 
-- Tablet: the matrix keeps its person column in place and scrolls the skills inside the table, so the page itself never scrolls sideways. The list tables (catalogue, expiring) fold the columns that do not fit into the row. Checked at 820 px width. On a phone the pages fold the same way and the dialog shows its fields below each other, checked at 390 px; the matrix itself stays a wide table that scrolls sideways, so a phone is fine for looking something up, not for working in it.
+- Tablet: the matrix keeps its person column in place and scrolls the skills inside the table, so the page itself never scrolls sideways. The list tables (catalogue, expiring) keep the columns that matter in one line: the columns have an importance, the actions stay in the row, and the least important ones (level and certificate on the Expiring page, the description in the catalogue) are left out when there is no room, as they are one click away. Checked at 820 px width. On a phone the pages fold the same way and the dialog shows its fields below each other, checked at 390 px; the matrix itself stays a wide table that scrolls sideways, so a phone is fine for looking something up, not for working in it.
 
 ## Reading a certificate with AI
 
 - Optional. With `ANTHROPIC_API_KEY` set on the server, a new certificate in the assignment dialog gets a "Read dates" button. Without the key the button is not shown and nothing else changes.
-- The AI only reads: holder name, title and the two dates, each of which may be "not found". It is told not to guess or calculate, and to treat the document as data.
+- The AI only reads: holder name, whether the document is for this skill, and the two dates, each of which may be "not found". It is told not to guess or calculate, and to treat the document as data.
 - The code decides what is usable. Dates must be real dates in the right order, and it adds a note when the certificate has expired or is issued to someone else. These checks are pure functions with unit tests.
 - The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
 - The certificate is also checked against what is stored: a note appears when the AI says it is clearly for another skill, or when a date printed on it differs from the date of the assignment. Only a date that is on the certificate is compared.
@@ -103,7 +108,7 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 ## Asking the matrix a question
 
 - With the AI key set, the matrix has an "Ask" field: "who can do Welding and First Aid?" sets the skill, status and level filters.
-- The AI turns the question into filter values and nothing else. It does not answer and it never sees persons or assignments: only the question and the names of skills and levels are sent. A browser test checks the request.
+- The AI turns the question into filter values and nothing else. It does not answer and it never sees the persons or assignments of the company: only the question and the names of skills and levels are sent. A name the user types in the question is part of the question and is sent with it; the tooltip says so. A browser test checks the request.
 - The code keeps only names and statuses that exist, tells the user what was left out, and the matrix computes the result with the same tested filter rules as a manual filter. A wrong answer from the AI can therefore only produce a wrong filter, which is visible and can be changed by hand.
 - A question about a skill that does not exist sets no filter at all and says which name was not found. The first version left the unknown skill out and kept the rest, so "who is certified for diving?" showed everyone with any valid skill. The evaluation found that.
 - `npm run eval:ai` also runs six questions with known filters, including German, a skill that does not exist and an instruction hidden in the question. The same question can get a different answer the next time, so `npm run eval:ai -- 3` asks each one three times and only counts it when all three match. Last run: 6 of 6 questions correct in all three runs. Before the fix above it was 4 of 6. The same command checks six skill names against the catalogue and the column titles of five import files; last run 6 of 6 and 5 of 5 in all three runs, on the small model.
@@ -124,9 +129,9 @@ The import writes one request per skill through the same service as the dialogs,
 
 ## Languages
 
-- The app is in English and German, with an EN / DE switch in the shell bar. The first visit follows the browser: German when its language starts with `de`, otherwise English. The choice is remembered in `localStorage`.
+- The app is in English and German, with an EN / DE switch in the top bar. The first visit follows the browser: German when its language starts with `de`, otherwise English. The choice is remembered in `localStorage`.
 - The texts are two plain objects, `src/lib/i18n/en.ts` and `de.ts`. The English one defines the keys and the German one is typed against it, so a missing key does not compile. One `translate` function fills `{name}` placeholders and chooses between `one` and `other` by a `count` parameter, which is all the plural handling these two languages need. A unit test checks that both files have the same keys and placeholders.
-- No library: `next-intl` or `i18next` bring routing by locale, message formats and loaders that an app with two languages and about 220 texts does not use, and the assessment should stay explainable line by line. If a third language with other plural rules were added, `Intl.PluralRules` would replace the `count === 1` check.
+- No library: `next-intl` or `i18next` bring routing by locale, message formats and loaders that an app with two languages and about 290 texts does not use, and the assessment should stay explainable line by line. If a third language with other plural rules were added, `Intl.PluralRules` would replace the `count === 1` check.
 - The pure rules in `src/lib/domain` return a message key with parameters instead of a sentence (`{ key: "hint.until", params: { date } }`), and the UI translates it. They stay free of React and their tests do not depend on wording. The one exception is the export table, which builds finished cell texts and therefore receives the translate function.
 - Errors from the services are `UserError` objects with the same key and parameters. Their own `message` is the English text, so scripts and logs stay readable, and `toUserMessage` translates them for the screen.
 - The pages are prerendered in English. The provider reads the language with `useSyncExternalStore` and an English server snapshot, so the first browser render matches the HTML and React switches to German right after. A German user sees the English shell for a moment on a cold load; avoiding that would need a cookie and server rendering per request.
@@ -139,7 +144,13 @@ The import writes one request per skill through the same service as the dialogs,
 - `npm run mcp` starts a small MCP server, so an AI assistant can answer questions about the matrix: which skills exist, who holds one, what a person has, what expires soon.
 - Read-only by design: it has four tools and none of them writes. It reads through the app's proxy like the other scripts, so it needs no credentials of its own.
 - The answers are built by pure functions on top of the same rules as the app (status, expiry window, which assignment counts), with unit tests. The assistant gets facts and does not calculate a status itself.
-- Unlike the two AI features in the app, this one does hand person data to the assistant that is connected. That is the purpose, and the user chooses which assistant to connect.
+- Unlike the AI features in the app, this one does hand person data to the assistant that is connected. That is the purpose, and the user chooses which assistant to connect.
+
+## Access code
+
+- The app has no login, and the checks that keep writes inside the namespace run in the browser. A copy on a public URL would let anyone write to the shared company and use the AI key.
+- `APP_ACCESS_CODE` closes that: when it is set, `src/proxy.ts` answers every page and every API route, the FSM proxy and the AI routes included, with 401 until the browser sends the code. Without the variable nothing changes, so local work, the tests and CI are not affected.
+- It is one shared code, not a login per person: enough to keep a demo URL private, not a replacement for real authentication.
 
 ## History of changes
 
@@ -158,4 +169,4 @@ The import writes one request per skill through the same service as the dialogs,
 - `npm run smoke` exercises the service layer against the real company and deletes what it created.
 - Two review agents live in `.claude/agents`: a code reviewer and an evaluator that scores the repository against the assignment. Both are read-only. Their findings were checked against the code before anything was changed.
 - `package.json` forces a newer `minimatch` inside the TypeScript lint parser, because the version it asks for has a known advisory. It is a development tool only. The other `npm install` warnings come from `picomatch`, for which no fixed version exists yet; `npm audit --omit=dev` reports nothing.
-- `npm run seed` creates 5 skills, 10 assignments and 4 sample certificates with dates relative to today, and skips what already exists. `npm run cleanup` only lists unless called with `-- --yes`.
+- `npm run seed` creates 7 skills, 13 assignments and 5 sample certificates with dates relative to today, and skips what already exists. `npm run cleanup` only lists unless called with `-- --yes`.

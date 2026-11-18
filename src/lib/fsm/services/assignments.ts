@@ -80,17 +80,20 @@ export async function createAssignments(skillId: string, inputs: (AssignmentInpu
   }));
   const created = assertBulkOk<SkillServiceSkill>(await skillApi("v2/skills", { method: "POST", body })).map(toAssignment);
 
-  // FSM gives a new skill the default level of the scale, even when none is sent. "No level"
-  // therefore needs a second call that clears it.
-  // If the second call fails, the assignment keeps the default level and is returned with it,
-  // so the matrix and the history show what FSM really holds.
-  for (const [index, assignment] of created.entries()) {
-    if (inputs[index].levelId || !assignment.levelId) continue;
-    try {
-      await patchAssignment(skill.id, assignment.id, null, dates[index]);
-      created[index] = { ...assignment, levelId: null, levelName: null, level: null };
-    } catch {}
-  }
+  // FSM gives every new skill the first level of the scale, whatever is sent: no
+  // proficiencyId, null, and a scale without a default level were all tried. "No level"
+  // therefore needs one more call per skill that clears it. They run together.
+  // If such a call fails, the assignment keeps that level and is returned with it, so the
+  // matrix and the history show what FSM really holds.
+  await Promise.all(
+    created.map(async (assignment, index) => {
+      if (inputs[index].levelId || !assignment.levelId) return;
+      try {
+        await patchAssignment(skill.id, assignment.id, null, dates[index]);
+        created[index] = { ...assignment, levelId: null, levelName: null, level: null };
+      } catch {}
+    }),
+  );
   return created;
 }
 

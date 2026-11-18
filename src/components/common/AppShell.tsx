@@ -2,8 +2,17 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Icon, MessageStrip, SegmentedButton, SegmentedButtonItem, ShellBar, ShellBarItem, Tab, TabContainer } from "@ui5/webcomponents-react";
-import { CANDIDATE_ID } from "@/lib/candidate";
+import {
+  Icon,
+  MessageStrip,
+  SegmentedButton,
+  SegmentedButtonItem,
+  ShellBar,
+  ShellBarBranding,
+  ShellBarItem,
+  Tab,
+  TabContainer,
+} from "@ui5/webcomponents-react";
 import { HelpDialog } from "./HelpDialog";
 import { DEMO_MODE } from "@/lib/demo/mode";
 import { useI18n } from "@/lib/i18n/I18nProvider";
@@ -14,6 +23,7 @@ const PAGES = [
   { path: "/", title: "nav.matrix" },
   { path: "/catalog", title: "nav.catalog" },
   { path: "/expiry", title: "nav.expiry" },
+  { path: "/me", title: "nav.me" },
   { path: "/history", title: "nav.history" },
 ] as const;
 
@@ -57,18 +67,29 @@ export function AppShell({ children }: { children: ReactNode }) {
     } catch {}
   }
 
+  // The bar names the connection only when it is not the normal one. The help names the company.
   let connection = "";
   if (DEMO_MODE) connection = t("shell.demoData");
-  else if (health) connection = health.ok ? `SAP FSM: ${health.companyName}` : t("shell.notConnected");
+  else if (health && !health.ok) connection = t("shell.notConnected");
 
   return (
     <>
       <title>{t("app.title")}</title>
       <ShellBar
-        primaryTitle={t("app.title")}
+        // The name of the app leads home, to the matrix, as the shell bar of a Fiori app does.
+        branding={
+          <ShellBarBranding
+            logo={<Icon name="wrench" design="Information" className={styles.logo} />}
+            href="/"
+            onClick={(event) => {
+              event.preventDefault();
+              router.push("/");
+            }}
+          >
+            {t("app.title")}
+          </ShellBarBranding>
+        }
         secondaryTitle={connection}
-        onLogoClick={() => router.push("/")}
-        logo={<Icon name="wrench" design="Information" className={styles.logo} />}
         assistant={
           <SegmentedButton
             accessibleName={t("shell.language")}
@@ -98,8 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         {children}
       </main>
-      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
-      <footer className={styles.footer}>{t("shell.namespace", { id: CANDIDATE_ID })}</footer>
+      {helpOpen && <HelpDialog company={health?.ok ? health.companyName : undefined} onClose={() => setHelpOpen(false)} />}
     </>
   );
 }

@@ -36,6 +36,7 @@ import type { Level, Person, Skill } from "@/lib/fsm/services/model";
 import { listLevels } from "@/lib/fsm/services/scale";
 import { recordAssigned } from "@/lib/history/store";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { SortButton, useSort, type SortColumn } from "@/components/common/useSort";
 import styles from "./ImportDialog.module.css";
 
 interface Props {
@@ -71,24 +72,44 @@ async function readRows(file: File): Promise<unknown[][]> {
 
 // Creates assignments from a file. Every row is shown first with what it would create or why
 // it cannot be imported, and only the ticked rows are saved.
+const SORT_COLUMNS: SortColumn[] = [
+  { key: "line", label: "import.row" },
+  { key: "person", label: "field.person" },
+  { key: "skill", label: "field.skill" },
+  { key: "level", label: "field.level" },
+  { key: "validFrom", label: "field.validFrom" },
+  { key: "validTo", label: "field.validTo" },
+  { key: "result", label: "import.result" },
+];
+
 export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, onSaved, onChanged }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [skipped, setSkipped] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { t } = useI18n();
+  const sort = useSort();
 
   const loadLevels = useCallback(async () => {
     const scaleIds = [...new Set(skills.map((skill) => skill.scaleId).filter((id) => id !== null))];
     const lists = await Promise.all(scaleIds.map(listLevels));
     return Object.fromEntries(scaleIds.map((id, index) => [id, lists[index]])) as Record<string, Level[]>;
   }, [skills]);
-  const levels = useAsyncData(loadLevels).data;
+  const { data: levels, error: levelsError } = useAsyncData(loadLevels);
 
   const rows = sheet && levels ? toImportRows(sheet.rows, sheet.columns, { persons, skills, levels, isAssigned }) : [];
   const chosen = rows.filter((row) => !row.problem && !skipped.includes(row.line));
   const allLevels = Object.values(levels ?? {}).flat();
   const levelName = (levelId: string | null) => allLevels.find((level) => level.id === levelId)?.name ?? "";
+  const shownRows = sort.apply(rows, {
+    line: (row) => row.line,
+    person: (row) => row.personText,
+    skill: (row) => row.skillText,
+    level: (row) => levelName(row.levelId),
+    validFrom: (row) => row.startDate ?? "",
+    validTo: (row) => row.endDate ?? "",
+    result: (row) => (row.problem ? t(row.problem.key, row.problem.params) : ""),
+  });
 
   async function choose(file: File | undefined) {
     if (!file) return;
@@ -181,6 +202,11 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
     >
       <div className={styles.content}>
         <Text>{t("import.intro", { max: MAX_IMPORT_ROWS })}</Text>
+        {levelsError && (
+          <MessageStrip design="Negative" hideCloseButton>
+            {levelsError}
+          </MessageStrip>
+        )}
         {error && (
           <MessageStrip design="Negative" hideCloseButton>
             {error}
@@ -202,23 +228,38 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
                 {t("import.notUsed", { columns: notUsed.join(", ") })}
               </MessageStrip>
             )}
+            <SortButton columns={SORT_COLUMNS} sort={sort} />
             <Table
               accessibleName={t("import.title")}
               overflowMode="Popin"
               headerRow={
                 <TableHeaderRow>
                   <TableHeaderCell width="3rem" />
-                  <TableHeaderCell width="4rem">{t("import.row")}</TableHeaderCell>
-                  <TableHeaderCell minWidth="10rem">{t("field.person")}</TableHeaderCell>
-                  <TableHeaderCell minWidth="10rem">{t("field.skill")}</TableHeaderCell>
-                  <TableHeaderCell width="7rem">{t("field.level")}</TableHeaderCell>
-                  <TableHeaderCell width="7rem">{t("field.validFrom")}</TableHeaderCell>
-                  <TableHeaderCell width="7rem">{t("field.validTo")}</TableHeaderCell>
-                  <TableHeaderCell minWidth="12rem">{t("import.result")}</TableHeaderCell>
+                  <TableHeaderCell width="4rem" sortIndicator={sort.indicator("line")}>
+                    {t("import.row")}
+                  </TableHeaderCell>
+                  <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("person")}>
+                    {t("field.person")}
+                  </TableHeaderCell>
+                  <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("skill")}>
+                    {t("field.skill")}
+                  </TableHeaderCell>
+                  <TableHeaderCell width="7rem" sortIndicator={sort.indicator("level")}>
+                    {t("field.level")}
+                  </TableHeaderCell>
+                  <TableHeaderCell width="7rem" sortIndicator={sort.indicator("validFrom")}>
+                    {t("field.validFrom")}
+                  </TableHeaderCell>
+                  <TableHeaderCell width="7rem" sortIndicator={sort.indicator("validTo")}>
+                    {t("field.validTo")}
+                  </TableHeaderCell>
+                  <TableHeaderCell minWidth="12rem" sortIndicator={sort.indicator("result")}>
+                    {t("import.result")}
+                  </TableHeaderCell>
                 </TableHeaderRow>
               }
             >
-              {rows.map((row) => (
+              {shownRows.map((row) => (
                 <TableRow key={row.line} rowKey={String(row.line)}>
                   <TableCell>
                     <CheckBox

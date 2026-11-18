@@ -12,7 +12,13 @@ export function expiringWithin<A extends { endDate: string | null }>(assignments
     .sort((a, b) => a.endDate!.localeCompare(b.endDate!));
 }
 
+// Assignments whose last valid day is in the past, the latest one first.
+export function alreadyExpired<A extends { endDate: string | null }>(assignments: A[], today: string): A[] {
+  return assignments.filter((assignment) => assignment.endDate !== null && assignment.endDate < today).sort((a, b) => b.endDate!.localeCompare(a.endDate!));
+}
+
 export function dueText(days: number): Message {
+  if (days < 0) return days === -1 ? { key: "due.yesterday" } : { key: "due.daysAgo", params: { count: -days } };
   if (days === 0) return { key: "due.today" };
   return days === 1 ? { key: "due.tomorrow" } : { key: "due.inDays", params: { count: days } };
 }

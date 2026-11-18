@@ -3,9 +3,12 @@
 import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
-  Bar,
   Button,
+  FilterBar,
+  FilterGroupItem,
+  Icon,
   IllustratedMessage,
+  Input,
   MessageStrip,
   Table,
   TableCell,
@@ -16,6 +19,8 @@ import {
   Title,
 } from "@ui5/webcomponents-react";
 import shell from "@/components/common/AppShell.module.css";
+import { PageToolbar } from "@/components/common/PageToolbar";
+import { useSort, type SortColumn } from "@/components/common/useSort";
 import { useToast } from "@/components/common/useToast";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { canUndo, changedFields, type Change } from "@/lib/domain/history";
@@ -30,11 +35,20 @@ import { useI18n } from "@/lib/i18n/I18nProvider";
 const readChanges = async () => loadChanges();
 
 // The changes made in this browser, with Undo for the latest change of each assignment.
+const SORT_COLUMNS: SortColumn[] = [
+  { key: "when", label: "history.when" },
+  { key: "person", label: "field.person" },
+  { key: "skill", label: "field.skill" },
+  { key: "change", label: "history.change" },
+];
+
 export function HistoryList() {
   const { data, reload } = useAsyncData(readChanges);
   const changes = data ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sort = useSort();
+  const [search, setSearch] = useState("");
   const { toastElement, showToast } = useToast();
   const { t } = useI18n();
 
@@ -68,12 +82,54 @@ export function HistoryList() {
     setBusyId(null);
   }
 
+  const wanted = search.trim().toLowerCase();
+  const shownChanges = sort.apply(
+    changes.filter((change) => change.personName.toLowerCase().includes(wanted)),
+    {
+      when: (change) => change.at,
+      person: (change) => change.personName,
+      skill: (change) => change.skillName,
+      change: (change) => describe(change),
+    },
+  );
   const time = (iso: string) => new Date(iso).toLocaleString("de-CH", { timeZone: TIME_ZONE, dateStyle: "short", timeStyle: "short" });
 
   return (
-    <div className={`${shell.panel} ${shell.narrow}`}>
-      <Bar design="Header" startContent={<Title level="H3">{t("history.title", { count: changes.length })}</Title>} />
-      <Text>{t("history.intro")}</Text>
+    <div className={shell.panel}>
+      <div className={shell.header}>
+        <Title level="H3">{t("history.title", { count: changes.length })}</Title>
+        <PageToolbar
+          name="changes"
+          getRows={() => [
+            [t("history.when"), t("field.person"), t("field.skill"), t("history.change")],
+            ...shownChanges.map((change) => [time(change.at), change.personName, change.skillName, describe(change)]),
+          ]}
+          canExport={shownChanges.length > 0}
+          onRefresh={reload}
+          onError={showToast}
+          sorting={{ columns: SORT_COLUMNS, sort }}
+        />
+      </div>
+      <FilterBar
+        className={shell.filterBar}
+        filterContainerWidth="13rem"
+        hideFilterConfiguration
+        hideToggleFiltersButton
+        hideToolbar
+        showClearOnFB={search !== ""}
+        onClear={() => setSearch("")}
+      >
+        <FilterGroupItem filterKey="person" label={t("field.person")}>
+          <Input
+            placeholder={t("filter.searchPerson")}
+            accessibleName={t("filter.searchPerson")}
+            showClearIcon
+            icon={<Icon name="search" />}
+            value={search}
+            onInput={(event) => setSearch(event.target.value)}
+          />
+        </FilterGroupItem>
+      </FilterBar>
       {error && (
         <MessageStrip design="Negative" onClose={() => setError(null)}>
           {error}
@@ -88,17 +144,25 @@ export function HistoryList() {
           overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
-              <TableHeaderCell width="9rem">{t("history.when")}</TableHeaderCell>
-              <TableHeaderCell minWidth="10rem">{t("field.person")}</TableHeaderCell>
-              <TableHeaderCell minWidth="10rem">{t("field.skill")}</TableHeaderCell>
-              <TableHeaderCell minWidth="16rem">{t("history.change")}</TableHeaderCell>
-              <TableHeaderCell width="9rem" horizontalAlign="End">
+              <TableHeaderCell minWidth="9rem" sortIndicator={sort.indicator("when")}>
+                {t("history.when")}
+              </TableHeaderCell>
+              <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("person")}>
+                {t("field.person")}
+              </TableHeaderCell>
+              <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("skill")}>
+                {t("field.skill")}
+              </TableHeaderCell>
+              <TableHeaderCell minWidth="16rem" sortIndicator={sort.indicator("change")}>
+                {t("history.change")}
+              </TableHeaderCell>
+              <TableHeaderCell width="9rem" horizontalAlign="End" importance={1}>
                 {t("field.actions")}
               </TableHeaderCell>
             </TableHeaderRow>
           }
         >
-          {changes.map((change) => (
+          {shownChanges.map((change) => (
             <TableRow key={change.id} rowKey={change.id}>
               <TableCell>
                 <Text>{time(change.at)}</Text>

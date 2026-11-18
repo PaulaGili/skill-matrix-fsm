@@ -15,6 +15,8 @@ const SKILLS = [
   { name: "Working at Heights", description: "Fall protection" },
   { name: "Electrical Switching", description: "Switching permit" },
   { name: "Gas Engines", description: null },
+  { name: "Confined Spaces", description: "Entry and rescue" },
+  { name: "Crane Operation", description: null },
 ];
 
 // person = position in the list of active employees; from/to = days relative to today.
@@ -29,6 +31,9 @@ const ASSIGNMENTS = [
   { person: 4, skill: "Working at Heights", level: 1, from: -10, to: null, certificate: false },
   { person: 5, skill: "Electrical Switching", level: 2, from: -800, to: -1, certificate: false },
   { person: 6, skill: "Welding", level: 1, from: 0, to: null, certificate: false },
+  { person: 3, skill: "Confined Spaces", level: 3, from: -200, to: null, certificate: false },
+  { person: 7, skill: "Confined Spaces", level: 2, from: -60, to: 20, certificate: false },
+  { person: 8, skill: "Crane Operation", level: 1, from: -90, to: 400, certificate: true },
 ];
 
 run(async () => {

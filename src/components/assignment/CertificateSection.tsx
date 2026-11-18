@@ -7,7 +7,7 @@ import { formatDate, todayIso } from "@/lib/domain/status";
 import { certificateUrl } from "@/lib/fsm/services/certificates";
 import type { Certificate } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { CertificatePreview } from "./CertificatePreview";
+import { CertificateDialog } from "./CertificateDialog";
 import styles from "./AssignmentDialog.module.css";
 
 interface Props {
@@ -24,8 +24,7 @@ interface Props {
 // Existing certificates can be opened or marked for deletion, and new files are queued.
 // Nothing is written until the dialog is saved.
 export function CertificateSection({ certificates, removedIds, newFiles, disabled, onToggleRemoved, onNewFiles, onRejected, onRead }: Props) {
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const preview = certificates.find((certificate) => certificate.id === previewId);
+  const [viewed, setViewed] = useState<Certificate | null>(null);
   const { t } = useI18n();
 
   function addFiles(selected: FileList | null) {
@@ -48,7 +47,6 @@ export function CertificateSection({ certificates, removedIds, newFiles, disable
       <ul className={styles.files}>
         {certificates.map((certificate) => {
           const removed = removedIds.includes(certificate.id);
-          const shown = previewId === certificate.id;
           return (
             <li key={certificate.id}>
               <Link className={`${styles.fileName} ${removed ? styles.removed : ""}`} href={certificateUrl(certificate)} target="_blank">
@@ -57,10 +55,10 @@ export function CertificateSection({ certificates, removedIds, newFiles, disable
               <span className={styles.hint}>{certificate.createdAt ? formatDate(todayIso(new Date(certificate.createdAt))) : ""}</span>
               <Button
                 design="Transparent"
-                icon={shown ? "hide" : "show"}
-                accessibleName={t(shown ? "certificate.hidePreviewOf" : "certificate.showPreviewOf", { file: certificate.fileName })}
-                tooltip={t(shown ? "certificate.hidePreview" : "certificate.showPreview")}
-                onClick={() => setPreviewId(shown ? null : certificate.id)}
+                icon="show"
+                accessibleName={t("certificate.showPreviewOf", { file: certificate.fileName })}
+                tooltip={t("certificate.showPreview")}
+                onClick={() => setViewed(certificate)}
               />
               <Button
                 design="Transparent"
@@ -93,7 +91,7 @@ export function CertificateSection({ certificates, removedIds, newFiles, disable
           </li>
         ))}
       </ul>
-      {preview && <CertificatePreview key={preview.id} certificate={preview} />}
+      {viewed && <CertificateDialog title={t("field.certificate")} certificates={[viewed]} onClose={() => setViewed(null)} />}
       <FileUploader hideInput multiple accept={CERTIFICATE_ACCEPT} disabled={disabled} onChange={(event) => addFiles(event.detail.files)}>
         <Button icon="add" disabled={disabled}>
           {t("certificate.addFiles")}

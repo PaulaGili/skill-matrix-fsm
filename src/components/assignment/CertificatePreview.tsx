@@ -35,7 +35,8 @@ export function CertificatePreview({ certificate }: { certificate: Certificate }
   if (failed) return <Text className={styles.error}>{t("certificate.previewFailed")}</Text>;
   if (!url) return <BusyIndicator active delay={0} />;
   return isPdf ? (
-    <iframe className={styles.preview} src={url} title={title} />
+    // Without the page list of the browser's PDF viewer, the page itself gets the room.
+    <iframe className={styles.preview} src={`${url}#navpanes=0`} title={title} />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element -- a blob URL, not a static asset
     <img className={styles.preview} src={url} alt={title} />

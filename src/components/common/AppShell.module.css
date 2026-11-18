@@ -1,24 +1,9 @@
 .main {
-  /* The bottom space keeps the last row clear of the fixed footer. */
-  padding: 1rem 2rem 3.5rem;
+  padding: 1rem 2rem 2rem;
   display: grid;
   /* Without minmax(0, ...) a wide table stretches the page instead of scrolling or folding. */
   grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
-}
-
-/* Always at the bottom of the window, whatever the length of the page. */
-.footer {
-  position: fixed;
-  z-index: 1;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.5rem 2rem;
-  background: var(--sapPageFooter_Background);
-  border-top: 1px solid var(--sapPageFooter_BorderColor);
-  color: var(--sapContent_LabelColor);
-  font-size: var(--sapFontSize);
 }
 
 .panel {
@@ -30,11 +15,34 @@
   border-radius: var(--sapElement_BorderCornerRadius);
 }
 
-/* A list with a few columns is easier to read when it does not stretch across a wide screen. */
-.narrow {
-  width: 100%;
-  max-width: 80rem;
-  margin: 0 auto;
+/* The title and the actions of a page share a line and fold below each other on a narrow screen. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The page actions: a UI5 toolbar that is as wide as its buttons. */
+.toolbar {
+  width: auto;
+  flex: none;
+  border-bottom: none;
+}
+
+/* Tablet and smaller: less margin around the content. */
+@media (max-width: 64rem) {
+  .main {
+    padding: 0.75rem 1rem 1.5rem;
+  }
 }
 
 .logo {
@@ -42,13 +50,24 @@
   height: 1.75rem;
 }
 
-/* Tablet and smaller: less margin around the content. */
-@media (max-width: 64rem) {
-  .main {
-    padding: 0.75rem 1rem 3.5rem;
-  }
+/* The UI5 filter bar inside a panel: the panel already gives the frame and the margin. */
+.filterBar {
+  padding: 0;
+  box-shadow: none;
+}
 
-  .footer {
-    padding: 0.5rem 1rem;
-  }
+/* Every filter has the same width on every page, so the fields line up from tab to tab. */
+.filterBar [data-component-name="FilterBarFilterArea"] > [class*="filterItem"] {
+  flex: 0 0 14rem;
+}
+
+/* The place of the Clear button after the last filter. Kept small, so that five filters and
+   the button share one row and the table starts at the same height on every page. */
+.filterBar [data-component-name="FilterBarFilterArea"] > [class*="lastSpacer"] {
+  flex: 1 0 5rem;
+}
+
+/* The sort dialog waits next to the toolbar. Out of the flow, it does not push the buttons aside. */
+.offFlow {
+  position: absolute;
 }

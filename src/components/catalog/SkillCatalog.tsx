@@ -3,10 +3,13 @@
 import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
-  Bar,
   Button,
+  FilterBar,
+  FilterGroupItem,
+  Icon,
   IllustratedMessage,
-  ObjectStatus,
+  Input,
+  Link,
   Table,
   TableCell,
   TableHeaderCell,
@@ -14,39 +17,36 @@ import {
   TableRow,
   Text,
   Title,
+  ToolbarButton,
 } from "@ui5/webcomponents-react";
 import { LoadError, Loading } from "@/components/common/LoadState";
+import { PageToolbar } from "@/components/common/PageToolbar";
+import { useSort, type SortColumn } from "@/components/common/useSort";
 import { useToast } from "@/components/common/useToast";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { assignmentStatus, todayIso } from "@/lib/domain/status";
-import { listAssignments } from "@/lib/fsm/services/assignments";
-import { listCertificates } from "@/lib/fsm/services/certificates";
+import { indexAssignments } from "@/lib/domain/matrix";
+import { todayIso } from "@/lib/domain/status";
+import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Skill } from "@/lib/fsm/services/model";
-import { listSkills } from "@/lib/fsm/services/skills";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import shell from "@/components/common/AppShell.module.css";
-import styles from "./SkillCatalog.module.css";
 import { RemoveSkillDialog } from "./RemoveSkillDialog";
 import { SkillDialog } from "./SkillDialog";
+import { SkillHoldersDialog } from "./SkillHoldersDialog";
 
-async function loadCatalog() {
-  const [skills, assignments, certificates] = await Promise.all([listSkills(), listAssignments(), listCertificates()]);
-  return { skills, assignments, certificates };
-}
+const SORT_COLUMNS: SortColumn[] = [
+  { key: "name", label: "field.name" },
+  { key: "description", label: "field.description" },
+  { key: "assignments", label: "catalog.assignments" },
+];
 
-// How the assignments of a skill are shown in the list, problems first.
-const COUNTS = [
-  { status: "expired", state: "Negative" },
-  { status: "expiring", state: "Critical" },
-  { status: "valid", state: "Positive" },
-  { status: "notYetValid", state: "Information" },
-] as const;
-
-type OpenDialog = { type: "create" } | { type: "edit"; skill: Skill } | { type: "remove"; skill: Skill } | null;
+type OpenDialog = { type: "create" } | { type: "edit"; skill: Skill } | { type: "remove"; skill: Skill } | { type: "holders"; skill: Skill } | null;
 
 export function SkillCatalog() {
-  const { data, error, loading, reload } = useAsyncData(loadCatalog);
+  const { data, error, loading, reload } = useAsyncData(loadMatrixData);
   const [dialog, setDialog] = useState<OpenDialog>(null);
+  const [search, setSearch] = useState("");
+  const sort = useSort();
   const { toastElement, showToast } = useToast();
   const { t } = useI18n();
 
@@ -58,79 +58,127 @@ export function SkillCatalog() {
 
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
-  const { skills, assignments, certificates } = data;
-  const assignmentsOf = (skill: Skill) => assignments.filter((assignment) => assignment.skillId === skill.id);
+  const { persons, skills, assignments, certificates } = data;
+  const wanted = search.trim().toLowerCase();
   const today = todayIso();
-  const countOf = (skill: Skill, status: string) => assignmentsOf(skill).filter((assignment) => assignmentStatus(assignment, today) === status).length;
+  // Counted like the matrix shows them: one assignment per person and skill, known persons only.
+  const shownAssignments = [...indexAssignments(assignments, today).values()].filter((assignment) =>
+    persons.some((person) => person.id === assignment.personId),
+  );
+  const assignmentsOf = (skill: Skill) => shownAssignments.filter((assignment) => assignment.skillId === skill.id);
+  const matching = skills.filter((skill) => `${skill.name} ${skill.description ?? ""}`.toLowerCase().includes(wanted));
+  const shown = sort.apply(matching, {
+    name: (skill) => skill.name,
+    description: (skill) => skill.description ?? "",
+    assignments: (skill) => assignmentsOf(skill).length,
+  });
+  const exportRows = () => [
+    [t("field.name"), t("field.description"), t("catalog.assignments")],
+    ...shown.map((skill) => [skill.name, skill.description ?? "", String(assignmentsOf(skill).length)]),
+  ];
 
   return (
-    <div className={`${shell.panel} ${shell.narrow}`}>
-      <Bar
-        design="Header"
-        startContent={<Title level="H3">{t("catalog.title", { count: skills.length })}</Title>}
-        endContent={
-          <Button design="Emphasized" icon="add" onClick={() => setDialog({ type: "create" })}>
-            {t("catalog.create")}
-          </Button>
-        }
-      />
+    <div className={shell.panel}>
+      <div className={shell.header}>
+        <Title level="H3">{t("catalog.title", { count: skills.length })}</Title>
+        <PageToolbar
+          name="skill-catalogue"
+          getRows={exportRows}
+          canExport={shown.length > 0}
+          loading={loading}
+          onRefresh={reload}
+          onError={showToast}
+          sorting={{ columns: SORT_COLUMNS, sort }}
+        >
+          <ToolbarButton
+            design="Emphasized"
+            overflowPriority="NeverOverflow"
+            icon="add"
+            text={t("catalog.create")}
+            onClick={() => setDialog({ type: "create" })}
+          />
+        </PageToolbar>
+      </div>
       {error && <LoadError message={error} onRetry={reload} />}
+
+      {skills.length > 0 && (
+        <FilterBar
+          className={shell.filterBar}
+          filterContainerWidth="13rem"
+          hideFilterConfiguration
+          hideToggleFiltersButton
+          hideToolbar
+          showClearOnFB={search !== ""}
+          onClear={() => setSearch("")}
+        >
+          <FilterGroupItem filterKey="skill" label={t("field.skill")}>
+            <Input
+              placeholder={t("catalog.search")}
+              accessibleName={t("catalog.search")}
+              showClearIcon
+              icon={<Icon name="search" />}
+              value={search}
+              onInput={(event) => setSearch(event.target.value)}
+            />
+          </FilterGroupItem>
+        </FilterBar>
+      )}
+      {skills.length > 0 && shown.length === 0 && <Text>{t("catalog.noMatch")}</Text>}
 
       {skills.length === 0 ? (
         <IllustratedMessage name="NoEntries" titleText={t("matrix.noSkillsTitle")} subtitleText={t("catalog.emptyText")}>
           <Button onClick={() => setDialog({ type: "create" })}>{t("catalog.create")}</Button>
         </IllustratedMessage>
-      ) : (
+      ) : shown.length === 0 ? null : (
         <Table
           loading={loading}
           accessibleName={t("catalog.tableName")}
           overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
-              <TableHeaderCell minWidth="12rem">{t("field.name")}</TableHeaderCell>
-              <TableHeaderCell minWidth="12rem">{t("field.description")}</TableHeaderCell>
-              <TableHeaderCell minWidth="14rem">{t("catalog.assignments")}</TableHeaderCell>
-              <TableHeaderCell width="13rem" horizontalAlign="End">
+              <TableHeaderCell minWidth="10rem" importance={2} sortIndicator={sort.indicator("name")}>
+                {t("field.name")}
+              </TableHeaderCell>
+              <TableHeaderCell minWidth="10rem" importance={-1} popinHidden sortIndicator={sort.indicator("description")}>
+                {t("field.description")}
+              </TableHeaderCell>
+              <TableHeaderCell minWidth="7.5rem" sortIndicator={sort.indicator("assignments")}>
+                {t("catalog.assignments")}
+              </TableHeaderCell>
+              <TableHeaderCell width="6rem" horizontalAlign="End" importance={1}>
                 {t("field.actions")}
               </TableHeaderCell>
             </TableHeaderRow>
           }
         >
-          {skills.map((skill) => (
+          {shown.map((skill) => (
             <TableRow key={skill.id} rowKey={skill.id}>
               <TableCell>
-                <Text>{skill.name}</Text>
+                <Link accessibleRole="Button" accessibleName={t("skill.openLabel", { name: skill.name })} onClick={() => setDialog({ type: "holders", skill })}>
+                  {skill.name}
+                </Link>
               </TableCell>
               <TableCell>
                 <Text>{skill.description ?? ""}</Text>
               </TableCell>
               <TableCell>
-                <span className={styles.counts}>
-                  {assignmentsOf(skill).length === 0 && <Text>{t("catalog.notAssigned")}</Text>}
-                  {COUNTS.filter(({ status }) => countOf(skill, status) > 0).map(({ status, state }) => (
-                    <ObjectStatus key={status} state={state}>
-                      {t(`catalog.count.${status}`, { count: countOf(skill, status) })}
-                    </ObjectStatus>
-                  ))}
-                </span>
+                <Text>{assignmentsOf(skill).length}</Text>
               </TableCell>
               <TableCell horizontalAlign="End">
                 <Button
                   design="Transparent"
                   icon="edit"
+                  tooltip={t("action.edit")}
                   accessibleName={t("catalog.editSkill", { name: skill.name })}
                   onClick={() => setDialog({ type: "edit", skill })}
-                >
-                  {t("action.edit")}
-                </Button>
+                />
                 <Button
                   design="Transparent"
                   icon="delete"
+                  tooltip={t("action.delete")}
                   accessibleName={t("catalog.deleteSkill", { name: skill.name })}
                   onClick={() => setDialog({ type: "remove", skill })}
-                >
-                  {t("action.delete")}
-                </Button>
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -143,12 +191,15 @@ export function SkillCatalog() {
       {dialog?.type === "remove" && (
         <RemoveSkillDialog
           skill={dialog.skill}
-          assignments={assignmentsOf(dialog.skill)}
+          assignments={assignments.filter((assignment) => assignment.skillId === dialog.skill.id)}
           certificates={certificates.filter((c) => assignmentsOf(dialog.skill).some((a) => a.id === c.assignmentId))}
           onClose={() => setDialog(null)}
           onDone={finish}
           onFailed={reload}
         />
+      )}
+      {dialog?.type === "holders" && (
+        <SkillHoldersDialog skill={dialog.skill} persons={persons} assignments={shownAssignments} certificates={certificates} onClose={() => setDialog(null)} />
       )}
       {toastElement}
     </div>

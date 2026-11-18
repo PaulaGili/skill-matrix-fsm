@@ -102,3 +102,14 @@
     gap: 0.5rem;
   }
 }
+
+.viewer {
+  display: grid;
+  gap: 1rem;
+  width: min(52rem, 90vw);
+  padding: 0.5rem 0;
+}
+
+.viewer .preview {
+  height: 65vh;
+}
