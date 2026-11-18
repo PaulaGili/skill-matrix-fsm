@@ -43,6 +43,7 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
         <Text>{t("help.systemUsers")}</Text>
         <Text>{t("help.ask")}</Text>
         <Text>{t("help.assignSeveral")}</Text>
+        <Text>{t("help.person")}</Text>
         <Text>{t("help.import")}</Text>
 
         <Title level="H5">{t("nav.catalog")}</Title>

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { CertificateFacts } from "@/lib/domain/certificate-facts";
-import { MODEL } from "./server";
+import { DOCUMENT_MODEL } from "./server";
 
 const FactsSchema = z.object({
   holderName: z.string().nullable().describe("Full name of the person the certificate is issued to"),
@@ -27,7 +27,7 @@ export async function readCertificate(type: string, base64: string, skillName?: 
       : ({ type: "image", source: { type: "base64", media_type: type === "PNG" ? "image/png" : "image/jpeg", data: base64 } } as const);
 
   const response = await new Anthropic().messages.parse({
-    model: MODEL,
+    model: DOCUMENT_MODEL,
     max_tokens: 16000,
     system: INSTRUCTIONS,
     output_config: { effort: "low", format: zodOutputFormat(FactsSchema) },

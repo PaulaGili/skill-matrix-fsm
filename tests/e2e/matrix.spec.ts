@@ -21,9 +21,13 @@ test("a status filter keeps only the persons with a matching assignment", async 
 
   await page.getByRole("button", { name: "Expired, filter off" }).click();
 
-  await expect(page.getByText("Persons (1)")).toBeVisible();
+  await expect(page.getByText("Persons (1 of 3)")).toBeVisible();
   await expect(page.getByText("Conti, Carla")).toBeVisible();
   await expect(page.getByText("Aerni, Anna")).toBeHidden();
+
+  // One button takes every filter away again.
+  await page.getByRole("button", { name: "Clear all filters" }).click();
+  await expect(page.getByText("Persons (3)")).toBeVisible();
 });
 
 test("an FSM error is shown to the user with a way to retry", async ({ page }) => {
@@ -121,14 +125,14 @@ test("a question in plain words sets the filters", async ({ page }) => {
 
   await ask("who can weld?");
   await expect(page.getByText("Understood as: skill Welding, status Valid or Expiring soon.")).toBeVisible();
-  await expect(page.getByText("Persons (2)")).toBeVisible();
+  await expect(page.getByText("Persons (2 of 3)")).toBeVisible();
   // Only the question and the names of skills and levels are sent, no persons.
   expect(sent).toEqual({ question: "who can weld?", skills: ["First Aid", "Welding"], levels: ["Basic", "Expert"] });
 
   // A skill that does not exist changes no filter.
   await ask("who is certified for diving?");
   await expect(page.getByText("There is no skill or level called Diving, so no filter was set.")).toBeVisible();
-  await expect(page.getByText("Persons (2)")).toBeVisible();
+  await expect(page.getByText("Persons (2 of 3)")).toBeVisible();
 });
 
 test("the language switch shows the app in German and remembers the choice", async ({ page }) => {
@@ -201,4 +205,30 @@ test("an import file is checked row by row before anything is saved", async ({ p
   await expect(page.getByText("1 assignment imported.")).toBeVisible();
   const create = calls.slice(before).find((call) => call.path === "skill/v2/skills");
   expect(create?.body).toMatchObject([{ tagId: "T1", technician: "P3", endDate: "2030-12-31" }]);
+});
+
+test("a click on a person lists all skills of that person with the certificates", async ({ page }) => {
+  await mockFsm(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Show all skills of Aerni, Anna" }).click();
+
+  await expect(page.getByRole("heading", { name: "Skills (1)" })).toBeVisible();
+  await expect(page.getByRole("gridcell", { name: "Expert" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "welding.pdf" })).toBeVisible();
+});
+
+test("a skill column can be dragged to the right and to the left, and the order is kept", async ({ page }) => {
+  await mockFsm(page);
+  await page.goto("/");
+  const skills = async () => (await page.getByRole("columnheader").allInnerTexts()).filter((text) => text !== "" && text !== "Person");
+  const drag = (from: string, to: string) => page.getByRole("columnheader", { name: from }).dragTo(page.getByRole("columnheader", { name: to }));
+  await expect.poll(skills).toEqual(["First Aid", "Welding"]);
+
+  await drag("First Aid", "Welding");
+  await expect.poll(skills).toEqual(["Welding", "First Aid"]);
+  await page.reload();
+  await expect.poll(skills).toEqual(["Welding", "First Aid"]);
+
+  await drag("First Aid", "Welding");
+  await expect.poll(skills).toEqual(["First Aid", "Welding"]);
 });

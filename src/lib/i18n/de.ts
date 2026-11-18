@@ -13,6 +13,11 @@ export const de: Dictionary = {
   "shell.help": "Hilfe",
   "shell.language": "Sprache",
   "shell.demoBanner": "Demomodus: erfundene Beispieldaten anstelle von SAP FSM. Sie können alles ansehen, Änderungen werden jedoch nicht gespeichert.",
+  "shell.size": "Grössere oder kompakte Ansicht",
+  "person.openLabel": "Alle Qualifikationen von {name} anzeigen",
+  "person.skills": "Qualifikationen ({count})",
+  "person.none": "Diese Person hat noch keine Qualifikation.",
+  "person.certificates": "Zertifikate",
   "shell.namespace": "SAP-FSM-Namensraum: {id}",
 
   "action.cancel": "Abbrechen",
@@ -55,6 +60,8 @@ export const de: Dictionary = {
   "field.validTo": "Gültig bis",
   "field.todayIfEmpty": "Heute, falls leer",
   "field.noEndDate": "Kein Enddatum",
+  "field.status": "Status",
+  "field.datesHint": "Beide Datumsangaben sind optional. Ohne Gültig ab beginnt die Zuweisung heute, ohne Gültig bis endet sie nie.",
   "field.name": "Name",
   "field.description": "Beschreibung",
   "field.certificate": "Zertifikat",
@@ -72,7 +79,7 @@ export const de: Dictionary = {
   "filter.noCertificate": "Kein Zertifikat",
   "filter.on": "{label}, Filter ein",
   "filter.off": "{label}, Filter aus",
-  "filter.clear": "Zurücksetzen",
+  "filter.clear": "Alle Filter zurücksetzen",
   "filterHelp.valid": "Personen mit einer gültigen Zuweisung",
   "filterHelp.expiring": "Personen mit einer Zuweisung, die innerhalb von 30 Tagen endet",
   "filterHelp.expired": "Personen mit einer Zuweisung, deren Enddatum in der Vergangenheit liegt",
@@ -90,6 +97,9 @@ export const de: Dictionary = {
   "matrix.summary.expiring": "{count} bald ablaufend",
   "matrix.summary.noCertificate": "{count} ohne Zertifikat",
   "matrix.summaryHelp": "Nur diese anzeigen",
+  "filter.heldTodayOn": "Gültig und Läuft bald ab wurden eingeschaltet: wer diese Qualifikation heute hat.",
+  "matrix.personsOf": "Personen ({count} von {total})",
+  "matrix.summaryLabel": "Alle Techniker:",
   "matrix.noPersons": "Keine Personen entsprechen den Filtern.",
 
   "cell.unassignedTitle": "Nicht zugewiesen. Klicken zum Zuweisen.",
@@ -143,6 +153,7 @@ export const de: Dictionary = {
   "help.systemUsers": "Systembenutzer sind die Anmeldekonten derselben Personen. Sie sind ausgeblendet, solange Sie sie nicht einschalten.",
   "help.ask":
     "Wird das Feld Fragen angezeigt, setzt eine Frage in eigenen Worten die Filter für Sie. Nur die Frage und die Namen der Qualifikationen und Stufen werden an den KI-Dienst gesendet.",
+  "help.person": "Klicken Sie in der Matrix auf einen Namen, um alle Qualifikationen dieser Person mit ihren Zertifikaten zu sehen.",
   "help.import":
     "Importieren legt bis zu 20 Zuweisungen aus einer Excel- oder CSV-Datei an. Jede Zeile wird geprüft und zuerst angezeigt, und nichts wird gespeichert, bevor Sie bestätigen.",
   "help.assignSeveral":
@@ -218,6 +229,11 @@ export const de: Dictionary = {
   "catalog.create": "Qualifikation anlegen",
   "catalog.emptyText": "Legen Sie die erste Qualifikation an, um die Matrix zu beginnen.",
   "catalog.assignments": "Zuweisungen",
+  "catalog.notAssigned": "Noch nicht zugewiesen",
+  "catalog.count.expired": "{count} abgelaufen",
+  "catalog.count.expiring": "{count} bald ablaufend",
+  "catalog.count.valid": "{count} gültig",
+  "catalog.count.notYetValid": "{count} noch nicht gültig",
   "catalog.editSkill": "{name} bearbeiten",
   "catalog.deleteSkill": "{name} löschen",
 
@@ -313,10 +329,8 @@ export const de: Dictionary = {
   "error.assignmentConflict": "Jemand anderes hat diese Zuweisung in der Zwischenzeit geändert. Laden Sie neu und versuchen Sie es erneut.",
   "error.notAssignmentOfSkill": "Zuweisung {id} ist keine Zuweisung von {skill}.",
   "error.tooManyPersons": "Es können höchstens {max} Personen gleichzeitig zugewiesen werden.",
-  "error.levelNotCleared": {
-    one: "Die Zuweisungen wurden angelegt, aber {count} hat die Stufe {level} statt keiner Stufe. Öffnen Sie sie und entfernen Sie die Stufe.",
-    other: "Die Zuweisungen wurden angelegt, aber {count} haben die Stufe {level} statt keiner Stufe. Öffnen Sie sie und entfernen Sie die Stufe.",
-  },
+  "error.endedSome":
+    "FSM hat einen Fehler gemeldet, nachdem {done} von {total} Zuweisungen beendet wurden. Versuchen Sie es erneut, um die übrigen zu beenden.",
   "error.alreadyAssigned": {
     one: "Diese Person hat {skill} bereits. Laden Sie neu und versuchen Sie es erneut.",
     other: "{count} dieser Personen haben {skill} bereits. Laden Sie neu und versuchen Sie es erneut.",

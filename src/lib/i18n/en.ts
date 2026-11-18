@@ -12,6 +12,11 @@ export const en = {
   "shell.help": "Help",
   "shell.language": "Language",
   "shell.demoBanner": "Demo mode: invented sample data instead of SAP FSM. You can look at everything, but changes are not saved.",
+  "shell.size": "Larger or compact view",
+  "person.openLabel": "Show all skills of {name}",
+  "person.skills": "Skills ({count})",
+  "person.none": "This person has no skill yet.",
+  "person.certificates": "Certificates",
   "shell.namespace": "SAP FSM namespace: {id}",
 
   "action.cancel": "Cancel",
@@ -54,6 +59,8 @@ export const en = {
   "field.validTo": "Valid to",
   "field.todayIfEmpty": "Today if empty",
   "field.noEndDate": "No end date",
+  "field.status": "Status",
+  "field.datesHint": "Both dates are optional. Without valid from it starts today, without valid to it never ends.",
   "field.name": "Name",
   "field.description": "Description",
   "field.certificate": "Certificate",
@@ -70,7 +77,7 @@ export const en = {
   "filter.noCertificate": "No certificate",
   "filter.on": "{label}, filter on",
   "filter.off": "{label}, filter off",
-  "filter.clear": "Clear",
+  "filter.clear": "Clear all filters",
   "filterHelp.valid": "Persons with a valid assignment",
   "filterHelp.expiring": "Persons with an assignment that ends within 30 days",
   "filterHelp.expired": "Persons with an assignment whose end date is in the past",
@@ -88,6 +95,9 @@ export const en = {
   "matrix.summary.expiring": "{count} expiring soon",
   "matrix.summary.noCertificate": "{count} without certificate",
   "matrix.summaryHelp": "Show only these",
+  "filter.heldTodayOn": "Valid and Expiring soon were switched on: who holds this skill today.",
+  "matrix.personsOf": "Persons ({count} of {total})",
+  "matrix.summaryLabel": "All technicians:",
   "matrix.noPersons": "No persons match the filters.",
 
   "cell.unassignedTitle": "Not assigned. Click to assign.",
@@ -140,6 +150,7 @@ export const en = {
   "help.systemUsers": "System users are the login accounts of the same persons. They are hidden unless you switch them on.",
   "help.ask":
     "If the Ask field is shown, a question in plain words sets the filters for you. Only the question and the names of skills and levels are sent to the AI service.",
+  "help.person": "Click a name in the matrix to see all skills of that person with their certificates.",
   "help.import": "Import creates up to 20 assignments from an Excel or CSV file. Each row is checked and shown first, and nothing is saved before you confirm.",
   "help.assignSeveral": "Assign to several gives one skill to up to 20 persons at once, with the same level and the same or separate dates.",
   "help.catalogText":
@@ -212,6 +223,11 @@ export const en = {
   "catalog.create": "Create skill",
   "catalog.emptyText": "Create the first skill to start the matrix.",
   "catalog.assignments": "Assignments",
+  "catalog.notAssigned": "Not assigned yet",
+  "catalog.count.expired": "{count} expired",
+  "catalog.count.expiring": "{count} expiring soon",
+  "catalog.count.valid": "{count} valid",
+  "catalog.count.notYetValid": "{count} not yet valid",
   "catalog.editSkill": "Edit {name}",
   "catalog.deleteSkill": "Delete {name}",
 
@@ -306,10 +322,7 @@ export const en = {
   "error.assignmentConflict": "Someone else changed this assignment in the meantime. Reload and try again.",
   "error.notAssignmentOfSkill": "Assignment {id} is not an assignment of {skill}.",
   "error.tooManyPersons": "At most {max} persons can be assigned at once.",
-  "error.levelNotCleared": {
-    one: "The assignments were created, but {count} has the level {level} instead of no level. Open it and clear the level.",
-    other: "The assignments were created, but {count} have the level {level} instead of no level. Open them and clear the level.",
-  },
+  "error.endedSome": "FSM reported an error after {done} of {total} assignments were ended. Try again to end the rest.",
   "error.alreadyAssigned": {
     one: "This person already has {skill}. Reload and try again.",
     other: "{count} of these persons already have {skill}. Reload and try again.",

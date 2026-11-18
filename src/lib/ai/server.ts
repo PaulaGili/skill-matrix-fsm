@@ -2,7 +2,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
-export const MODEL = "claude-opus-5-5";
+// Reading a scanned certificate needs the strong model. The three short text tasks
+// (question, skill name, column titles) run on the small one, which is faster and far cheaper.
+export const DOCUMENT_MODEL = "claude-opus-5-5";
+export const TEXT_MODEL = "claude-haiku-5-5";
 
 export const aiEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
 export const fail = (status: number, error: string) => NextResponse.json({ error }, { status });

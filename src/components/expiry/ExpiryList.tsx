@@ -3,7 +3,6 @@
 import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
-  Bar,
   Button,
   Icon,
   IllustratedMessage,
@@ -86,26 +85,23 @@ export function ExpiryList() {
 
   return (
     <div className={`${shell.panel} ${shell.narrow}`}>
-      <Bar
-        design="Header"
-        startContent={<Title level="H3">{t("expiry.title", { count: rows.length })}</Title>}
-        endContent={
-          <span className={styles.actions}>
-            <Label for="expiry-window">{t("expiry.next")}</Label>
-            <Select id="expiry-window" onChange={(event) => setDays(Number(event.detail.selectedOption.dataset.days))}>
-              {WINDOWS.map((window) => (
-                <Option key={window} data-days={window} selected={window === days}>
-                  {t("expiry.days", { count: window })}
-                </Option>
-              ))}
-            </Select>
-            {rows.length > 0 && <ExportButton name="expiring-assignments" getRows={exportRows} onError={showToast} />}
-            <Button icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
-              {t("action.refresh")}
-            </Button>
-          </span>
-        }
-      />
+      <div className={styles.header}>
+        <Title level="H3">{t("expiry.title", { count: rows.length })}</Title>
+        <span className={styles.actions}>
+          <Label for="expiry-window">{t("expiry.next")}</Label>
+          <Select id="expiry-window" onChange={(event) => setDays(Number(event.detail.selectedOption.dataset.days))}>
+            {WINDOWS.map((window) => (
+              <Option key={window} data-days={window} selected={window === days}>
+                {t("expiry.days", { count: window })}
+              </Option>
+            ))}
+          </Select>
+          {rows.length > 0 && <ExportButton name="expiring-assignments" getRows={exportRows} onError={showToast} />}
+          <Button design="Transparent" icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
+            {t("action.refresh")}
+          </Button>
+        </span>
+      </div>
       {error && <LoadError message={error} onRetry={reload} />}
 
       <div className={styles.filters}>

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { QuestionAnswer } from "@/lib/domain/question";
-import { MODEL } from "./server";
+import { TEXT_MODEL } from "./server";
 
 const AnswerSchema = z.object({
   understood: z.boolean().describe("false when the question cannot be expressed with these filters"),
@@ -22,7 +22,7 @@ Set understood to false when the question is not about filtering this matrix. Th
 
 export async function questionToAnswer(question: string, skills: string[], levels: string[]): Promise<QuestionAnswer> {
   const response = await new Anthropic().messages.parse({
-    model: MODEL,
+    model: TEXT_MODEL,
     max_tokens: 16000,
     system: INSTRUCTIONS,
     output_config: { effort: "low", format: zodOutputFormat(AnswerSchema) },

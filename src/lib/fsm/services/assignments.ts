@@ -82,17 +82,15 @@ export async function createAssignments(skillId: string, inputs: (AssignmentInpu
 
   // FSM gives a new skill the default level of the scale, even when none is sent. "No level"
   // therefore needs a second call that clears it.
-  let notCleared = 0;
+  // If the second call fails, the assignment keeps the default level and is returned with it,
+  // so the matrix and the history show what FSM really holds.
   for (const [index, assignment] of created.entries()) {
     if (inputs[index].levelId || !assignment.levelId) continue;
     try {
       await patchAssignment(skill.id, assignment.id, null, dates[index]);
       created[index] = { ...assignment, levelId: null, levelName: null, level: null };
-    } catch {
-      notCleared++;
-    }
+    } catch {}
   }
-  if (notCleared > 0) throw new UserError({ key: "error.levelNotCleared", params: { count: notCleared, level: created[0].levelName ?? "" } });
   return created;
 }
 
@@ -121,14 +119,23 @@ export async function updateAssignment(skillId: string, loaded: Assignment, inpu
   await patchAssignment(skill.id, loaded.id, input.levelId, { startDate, endDate });
 }
 
-export async function endAssignments(skillId: string, assignmentIds: string[], endDate: string): Promise<void> {
+// Ends each assignment on the date `endDateOf` gives for it. If FSM fails halfway, the user
+// is told how many were ended; trying again ends the rest.
+export async function endAssignments(skillId: string, assignmentIds: string[], endDateOf: (assignment: Assignment) => string): Promise<void> {
   if (assignmentIds.length === 0) return;
   const { skill, assignments } = await requireOwnAssignments(skillId, assignmentIds);
-  for (const assignment of assignments) {
-    await skillApi(`v1/tags/${skill.id}/skills/${assignment.id}`, {
-      method: "PATCH",
-      body: { startDate: assignment.startDate, endDate, validityType: "LF" },
-    });
+  let ended = 0;
+  try {
+    for (const assignment of assignments) {
+      await skillApi(`v1/tags/${skill.id}/skills/${assignment.id}`, {
+        method: "PATCH",
+        body: { startDate: assignment.startDate, endDate: endDateOf(assignment), validityType: "LF" },
+      });
+      ended++;
+    }
+  } catch (error) {
+    if (ended === 0) throw error;
+    throw new UserError({ key: "error.endedSome", params: { done: ended, total: assignments.length } });
   }
 }
 

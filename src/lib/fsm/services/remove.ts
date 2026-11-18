@@ -28,6 +28,5 @@ export async function retireSkill(skillId: string): Promise<void> {
 
   await removeAssignments(skillId, ids(toRemove));
   // An assignment that started today cannot end yesterday, so today is its last valid day.
-  await endAssignments(skillId, ids(toEnd.filter((a) => a.startDate === today)), today);
-  await endAssignments(skillId, ids(toEnd.filter((a) => a.startDate !== today)), addDays(today, -1));
+  await endAssignments(skillId, ids(toEnd), (a) => (a.startDate === today ? today : addDays(today, -1)));
 }

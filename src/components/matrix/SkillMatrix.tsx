@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
@@ -9,6 +9,7 @@ import {
   Button,
   IllustratedMessage,
   Label,
+  Link,
   ObjectStatus,
   Switch,
   Title,
@@ -19,6 +20,7 @@ import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { BulkAssignDialog } from "@/components/assignment/BulkAssignDialog";
 import shell from "@/components/common/AppShell.module.css";
 import { ImportDialog } from "./ImportDialog";
+import { PersonDialog } from "./PersonDialog";
 import { ExportButton } from "@/components/common/ExportDialog";
 import { LoadError, Loading } from "@/components/common/LoadState";
 import { useToast } from "@/components/common/useToast";
@@ -31,6 +33,7 @@ import {
   cellKey,
   filterPersons,
   filterSkills,
+  inColumnOrder,
   personPasses,
   skillsWithMatches,
   sortRank,
@@ -57,7 +60,8 @@ const SUMMARY = [
 const COLUMN_ORDER_KEY = "matrix:columnOrder";
 function loadColumnOrder(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
+    const stored: unknown = JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored : [];
   } catch {
     return [];
   }
@@ -79,6 +83,7 @@ export function SkillMatrix() {
   const [selected, setSelected] = useState<{ person: Person; skill: Skill } | null>(null);
   const [assigningSeveral, setAssigningSeveral] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [shownPerson, setShownPerson] = useState<Person | null>(null);
   const { toastElement, showToast } = useToast();
   const aiEnabled = useAsyncData(isAiEnabled).data === true;
   const { t } = useI18n();
@@ -86,7 +91,10 @@ export function SkillMatrix() {
 
   // Selecting the first skill switches on Valid and Expiring soon: "who can do this today?".
   function selectSkills(ids: string[]) {
-    if (pickedSkillIds.length === 0 && ids.length > 0 && statusFilters.length === 0) setStatusFilters(HELD_TODAY);
+    if (pickedSkillIds.length === 0 && ids.length > 0 && statusFilters.length === 0) {
+      setStatusFilters(HELD_TODAY);
+      showToast(t("filter.heldTodayOn"));
+    }
     setSkillIds(ids);
   }
 
@@ -113,6 +121,17 @@ export function SkillMatrix() {
     try {
       localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
     } catch {}
+  }
+
+  // The dragged skill takes the place of the one it is dropped on. The table's own result
+  // is not used: dropped to the right it puts the column back where it was.
+  function moveColumn(draggedId: string, droppedId: string) {
+    const order = inColumnOrder(data?.skills ?? [], columnOrder).map((skill) => skill.id);
+    const from = order.indexOf(draggedId);
+    const to = order.indexOf(droppedId);
+    if (from === -1 || to === -1) return;
+    order.splice(to, 0, order.splice(from, 1)[0]);
+    saveColumnOrder(order);
   }
 
   const searched = useMemo(() => filterPersons(data?.persons ?? [], search, showSystemUsers), [data, search, showSystemUsers]);
@@ -145,7 +164,9 @@ export function SkillMatrix() {
           const person = row.original as Person;
           return (
             <span className={styles.person}>
-              <span>{person.displayName}</span>
+              <Link accessibleRole="Button" accessibleName={t("person.openLabel", { name: person.displayName })} onClick={() => setShownPerson(person)}>
+                {person.displayName}
+              </Link>
               <span className={styles.detail}>{person.isTechnician ? person.jobTitle : t("matrix.systemUser")}</span>
             </span>
           );
@@ -176,6 +197,18 @@ export function SkillMatrix() {
     [skills, cells, filters, t],
   );
 
+  // A coloured line at the start of the row: red when something of the shown skills has
+  // expired, orange when something expires soon.
+  const rowHighlight = useCallback(
+    (person: Record<string, unknown>) => {
+      const shown = skills.map((skill) => cells.get(cellKey(String(person.id), skill.id))).filter((cell) => cell && cellPasses(cell, filters));
+      const statuses = shown.map((cell) => cell?.status);
+      if (statuses.includes("expired")) return "Negative";
+      return statuses.includes("expiring") ? "Critical" : "None";
+    },
+    [skills, cells, filters],
+  );
+
   // The overview counts every technician, whatever is filtered at the moment.
   const summary = summarize(
     (data?.persons ?? []).filter((person) => person.isTechnician).map((person) => person.id),
@@ -184,6 +217,8 @@ export function SkillMatrix() {
 
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
+  // How many persons there are without any filter, to show "2 of 12".
+  const total = filterPersons(data.persons, "", showSystemUsers).length;
   const selectedAssignment = selected ? cells.get(cellKey(selected.person.id, selected.skill.id))?.assignment : undefined;
 
   return (
@@ -191,18 +226,20 @@ export function SkillMatrix() {
       <div className={styles.header}>
         <Title level="H2">{t("nav.matrix")}</Title>
         <span className={styles.inline}>
-          {data.skills.length > 0 && <ExportButton name="skill-matrix" getRows={() => matrixTable(persons, skills, cells, filters, t)} onError={showToast} />}
           {data.skills.length > 0 && (
-            <Button icon="add-employee" tooltip={t("matrix.assignSeveralTooltip")} onClick={() => setAssigningSeveral(true)}>
+            <ExportButton name="skill-matrix" getRows={() => matrixTable(persons, inColumnOrder(skills, columnOrder), cells, filters, t)} onError={showToast} />
+          )}
+          {data.skills.length > 0 && (
+            <Button design="Emphasized" icon="add-employee" tooltip={t("matrix.assignSeveralTooltip")} onClick={() => setAssigningSeveral(true)}>
               {t("matrix.assignSeveral")}
             </Button>
           )}
           {data.skills.length > 0 && (
-            <Button icon="upload" tooltip={t("import.tooltip")} onClick={() => setImporting(true)}>
+            <Button design="Transparent" icon="upload" tooltip={t("import.tooltip")} onClick={() => setImporting(true)}>
               {t("import.button")}
             </Button>
           )}
-          <Button icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
+          <Button design="Transparent" icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
             {t("action.refresh")}
           </Button>
         </span>
@@ -238,12 +275,21 @@ export function SkillMatrix() {
             onSkillIds={selectSkills}
             onLevels={setLevels}
             onStatusFilters={setStatusFilters}
+            onClearAll={() => {
+              setSearch("");
+              setSkillIds([]);
+              setLevels([]);
+              setStatusFilters([]);
+            }}
           />
 
           <AnalyticalTable
             header={
               <div className={styles.summary}>
-                <Title level="H5">{t("matrix.persons", { count: persons.length })}</Title>
+                <Title level="H5">
+                  {persons.length === total ? t("matrix.persons", { count: total }) : t("matrix.personsOf", { count: persons.length, total })}
+                </Title>
+                <Label>{t("matrix.summaryLabel")}</Label>
                 {SUMMARY.map(({ filter, state }) => (
                   <ObjectStatus
                     key={filter}
@@ -278,8 +324,16 @@ export function SkillMatrix() {
             minRows={1}
             rowHeight={52}
             sortable
+            withRowHighlight
+            highlightField={rowHighlight}
             columnOrder={columnOrder}
-            onColumnsReorder={(event) => saveColumnOrder(event.detail.columnsNewOrder.map((column) => String(column.id)))}
+            onColumnsReorder={(event) => {
+              // The event is the browser's drop event with the table's details added. The dragged
+              // and the target column are read from it, as the details do not name the target.
+              // The browser test for dragging guards this against a change in the table library.
+              const drop = event as unknown as DragEvent;
+              moveColumn(drop.dataTransfer?.getData("text") ?? "", (drop.currentTarget as HTMLElement).dataset.columnId ?? "");
+            }}
             filterable={false}
             groupable={false}
             noDataText={t("matrix.noPersons")}
@@ -315,6 +369,9 @@ export function SkillMatrix() {
           }}
           onChanged={reload}
         />
+      )}
+      {shownPerson && (
+        <PersonDialog person={shownPerson} skills={data.skills} cells={cells} certificates={data.certificates} onClose={() => setShownPerson(null)} />
       )}
       {importing && (
         <ImportDialog
