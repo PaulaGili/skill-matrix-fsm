@@ -8,9 +8,69 @@ A hosted copy runs on Vercel. The link and the access code are in my email.
 
 I hope you like it.
 
-![The skill matrix: persons as rows, skills as columns, each cell with status, level, end date and a clip when a certificate is attached](docs/images/matrix.png)
+## A quick tour
 
 The screenshots show the demo mode, which runs on invented data.
+
+### The matrix
+
+One page for everyone and everything. Green is fine, orange needs a look, red is too late. The clip says there is a certificate behind it.
+
+![The skill matrix: persons as rows, skills as columns, each cell with status, level and end date](docs/images/matrix.png)
+
+### One dialog for an assignment
+
+Click a cell. Level, dates and certificates are in one place, and nothing is saved until you press Save.
+
+![The dialog of one assignment with level, valid from, valid to and its certificates](docs/images/assignment.png)
+
+### Certificates you can look at
+
+PDFs and images open right in the app. No download, no searching through folders.
+
+![A certificate shown inside the app](docs/images/certificate.png)
+
+### Everything about one person
+
+Click a name and you see what that technician holds, with level, status and certificates.
+
+![All skills of one person in a dialog](docs/images/person.png)
+
+### One skill for the whole crew
+
+After a training day: one skill, several persons, one request. Same dates for all, or dates per person.
+
+![The dialog that assigns one skill to several persons](docs/images/several.png)
+
+### The catalogue
+
+Create, rename, delete. The number shows how many people hold a skill, and a click on the name shows who.
+
+![The skill catalogue with the number of assignments per skill](docs/images/catalog.png)
+
+### What runs out soon
+
+The page I would open every Monday. Soonest first, for the next 30 to 180 days, or what has already expired.
+
+![The list of assignments that end soon](docs/images/expiring.png)
+
+### My skills
+
+For the technicians themselves. Pick your name once and see what you hold. Read-only.
+
+![The read-only view of one technician](docs/images/my-skills.png)
+
+### Import from a spreadsheet
+
+Most teams already keep this list in Excel. Every row is checked and says why it cannot come in, before anything is saved.
+
+![The import preview: two rows ready, four rows with the reason why not](docs/images/import.png)
+
+### Auch auf Deutsch
+
+One click and the whole app speaks German, in Swiss spelling.
+
+![The matrix in German](docs/images/german.png)
 
 ## What is in it
 
@@ -26,10 +86,6 @@ I also added a few things that I thought a real service manager would ask for ne
 - a read-only MCP server, so an AI assistant can query the matrix.
 
 Further down I say what I would leave out if I started again.
-
-| Assigning and certificates | What expires soon |
-|---|---|
-| ![The dialog of one assignment: level, valid from, valid to and the list of certificates](docs/images/assignment.png) | ![The list of assignments that end within the next 30 days, soonest first](docs/images/expiring.png) |
 
 ## Running it
 
