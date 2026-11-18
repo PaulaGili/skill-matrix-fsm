@@ -2,6 +2,7 @@
 // that carries the proficiency level.
 import { assertBulkOk, skillApi, skillSearch } from "@/lib/fsm/client";
 import { NAME_PREFIX, isOwnName } from "@/lib/candidate";
+import { renewalError } from "@/lib/domain/expiry";
 import { MAX_IMPORT_ROWS } from "@/lib/domain/import";
 import { OPEN_END_DATE, todayIso, validateValidity } from "@/lib/domain/status";
 import { UserError } from "@/lib/i18n/translate";
@@ -137,20 +138,42 @@ export async function updateAssignment(skillId: string, loaded: Assignment, inpu
   await patchAssignment(skill.id, loaded.id, input.levelId, { startDate, endDate });
 }
 
-// Ends each assignment on the date `endDateOf` gives for it, all in one request. The bulk
-// route updates a skill that is sent with its id and keeps its level; checked against FSM.
-export async function endAssignments(skillId: string, assignmentIds: string[], endDateOf: (assignment: Assignment) => string): Promise<void> {
-  if (assignmentIds.length === 0) return;
-  const { skill, assignments } = await requireOwnAssignments(skillId, assignmentIds);
+// A new end date for each assignment, all in one request. The bulk route updates a skill that
+// is sent with its id and keeps its level; checked against FSM.
+async function writeEndDates(assignments: Assignment[], endDateOf: (assignment: Assignment) => string): Promise<void> {
   const body = assignments.map((assignment) => ({
     id: assignment.id,
-    tagId: skill.id,
+    tagId: assignment.skillId,
     technician: assignment.personId,
     startDate: assignment.startDate,
     endDate: endDateOf(assignment),
     validityType: "LF",
   }));
   assertBulkOk(await skillApi("v2/skills", { method: "POST", body }));
+}
+
+// Ends each assignment of a skill on the date `endDateOf` gives for it.
+export async function endAssignments(skillId: string, assignmentIds: string[], endDateOf: (assignment: Assignment) => string): Promise<void> {
+  if (assignmentIds.length === 0) return;
+  const { assignments } = await requireOwnAssignments(skillId, assignmentIds);
+  await writeEndDates(assignments, endDateOf);
+}
+
+// One later end date for assignments of any skills. `loaded` are the assignments as the user
+// saw them: if one is gone, not ours or changed since then, nothing is written.
+export async function renewAssignments(loaded: Assignment[], endDate: string): Promise<void> {
+  if (loaded.length > MAX_BULK_ASSIGNMENTS) throw new UserError({ key: "renew.tooMany", params: { max: MAX_BULK_ASSIGNMENTS } });
+  const error = renewalError(
+    loaded.map((assignment) => assignment.endDate),
+    endDate,
+  );
+  if (error) throw new UserError(error);
+  const [skills, current] = await Promise.all([listSkills(), listAssignments()]);
+  for (const assignment of loaded) {
+    const now = current.find((a) => a.id === assignment.id && skills.some((skill) => skill.id === a.skillId));
+    if (!now || now.startDate !== assignment.startDate || now.endDate !== assignment.endDate || now.levelId !== assignment.levelId) throw new ConflictError();
+  }
+  await writeEndDates(loaded, () => endDate);
 }
 
 // Deletes the FSM Skills only. The app calls removeAssignments() in remove.ts, which

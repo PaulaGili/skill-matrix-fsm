@@ -130,7 +130,7 @@ export function SkillMatrix() {
         sticky: "start",
         disableSticky: true,
         disableDragAndDrop: true,
-        width: 220,
+        width: 208,
         vAlign: "Middle",
         Cell: ({ row }: AnalyticalTableCellInstance) => {
           const person = row.original as Person;
@@ -149,7 +149,7 @@ export function SkillMatrix() {
         id: skill.id,
         accessor: (person) => cellKey(person.id, skill.id),
         disableSticky: true,
-        minWidth: 160,
+        minWidth: 162,
         hAlign: "Center",
         vAlign: "Middle",
         Cell: ({ row }: AnalyticalTableCellInstance) => {

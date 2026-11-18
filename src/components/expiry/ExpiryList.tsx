@@ -4,6 +4,7 @@ import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
   Button,
+  CheckBox,
   FilterGroupItem,
   IllustratedMessage,
   Option,
@@ -15,6 +16,7 @@ import {
   TableRow,
   Text,
   Title,
+  ToolbarButton,
 } from "@ui5/webcomponents-react";
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { CertificateDialog } from "@/components/assignment/CertificateDialog";
@@ -31,6 +33,7 @@ import { formatDate, todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Assignment, Person, Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { RenewDialog } from "./RenewDialog";
 
 const SORT_COLUMNS: SortColumn[] = [
   { key: "validTo", label: "field.validTo" },
@@ -45,7 +48,8 @@ const EXPIRED = 0;
 const WINDOWS = [30, 60, 90, 180, EXPIRED];
 
 // What runs out soon, soonest first, or what has already expired. The edit button of a row
-// opens the same dialog as a matrix cell, so an assignment can be renewed from here.
+// opens the same dialog as a matrix cell, so an assignment can be renewed from here. Ticked
+// rows are renewed together.
 export function ExpiryList() {
   const { data, error, loading, reload } = useAsyncData(loadMatrixData);
   const [days, setDays] = useState(WINDOWS[0]);
@@ -55,6 +59,8 @@ export function ExpiryList() {
   const [certificateFilter, setCertificateFilter] = useState<string[]>([]);
   const [selected, setSelected] = useState<{ assignment: Assignment; person: Person; skill: Skill } | null>(null);
   const [viewed, setViewed] = useState<Assignment | null>(null);
+  const [tickedIds, setTickedIds] = useState<string[]>([]);
+  const [renewing, setRenewing] = useState(false);
   const sort = useSort();
   const { toastElement, showToast } = useToast();
   const { t } = useI18n();
@@ -91,6 +97,9 @@ export function ExpiryList() {
     return t(message.key, message.params);
   };
   const levelNames = levelNamesOf(data.assignments);
+  // Only rows that are still listed count: a filter or a reload can take a ticked row away.
+  const ticked = rows.filter((assignment) => tickedIds.includes(assignment.id));
+  const tick = (id: string) => setTickedIds(tickedIds.includes(id) ? tickedIds.filter((ticked) => ticked !== id) : [...tickedIds, id]);
 
   const exportRows = () => [
     [t("field.validTo"), t("expiry.ends"), t("field.person"), t("field.skill"), t("field.level"), t("field.certificate")],
@@ -116,7 +125,19 @@ export function ExpiryList() {
           onRefresh={reload}
           onError={showToast}
           sorting={{ columns: SORT_COLUMNS, sort }}
-        />
+        >
+          {rows.length > 0 && (
+            <ToolbarButton
+              design="Emphasized"
+              overflowPriority="NeverOverflow"
+              icon="history"
+              text={ticked.length === 0 ? t("renew.buttonNone") : t("renew.button", { count: ticked.length })}
+              tooltip={t("renew.tooltip")}
+              disabled={ticked.length === 0}
+              onClick={() => setRenewing(true)}
+            />
+          )}
+        </PageToolbar>
       </div>
       {error && <LoadError message={error} onRetry={reload} />}
 
@@ -181,6 +202,7 @@ export function ExpiryList() {
           overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
+              <TableHeaderCell width="3rem" importance={2} />
               <TableHeaderCell minWidth="7rem" importance={2} sortIndicator={sort.indicator("validTo")}>
                 {t("field.validTo")}
               </TableHeaderCell>
@@ -205,6 +227,13 @@ export function ExpiryList() {
         >
           {rows.map((assignment) => (
             <TableRow key={assignment.id} rowKey={assignment.id}>
+              <TableCell>
+                <CheckBox
+                  accessibleName={t("renew.select", { skill: skill(assignment)!.name, person: person(assignment)!.displayName })}
+                  checked={tickedIds.includes(assignment.id)}
+                  onChange={() => tick(assignment.id)}
+                />
+              </TableCell>
               <TableCell>
                 <Text>{formatDate(assignment.endDate!)}</Text>
               </TableCell>
@@ -254,6 +283,19 @@ export function ExpiryList() {
           onClose={() => setSelected(null)}
           onSaved={(message) => {
             setSelected(null);
+            showToast(message);
+            reload();
+          }}
+          onChanged={reload}
+        />
+      )}
+      {renewing && (
+        <RenewDialog
+          rows={ticked.map((assignment) => ({ assignment, person: person(assignment)!, skill: skill(assignment)! }))}
+          onClose={() => setRenewing(false)}
+          onSaved={(message) => {
+            setRenewing(false);
+            setTickedIds([]);
             showToast(message);
             reload();
           }}
