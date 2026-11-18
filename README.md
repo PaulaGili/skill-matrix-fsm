@@ -4,19 +4,27 @@ Hi, I'm Paula, and this is my solution to the [assessment](ASSIGNMENT.md).
 
 The app answers one question for a service manager: who has which skill, backed by which certificate, valid until when. Everything is read from and written to SAP FSM through the proxy you provided. There is no other database.
 
+It also has four small AI helpers. You can ask the matrix a question, and it reads the dates from a certificate for you. I did not just trust them: I measured them, 29 cases, five runs each. More in [The AI part](#the-ai-part).
+
 A hosted copy runs on Vercel. The link and the access code are in my email.
 
 I hope you like it.
 
 ## A quick tour
 
-The screenshots show the demo mode, which runs on invented data.
+The screenshots show the demo mode, which runs on invented data. The AI is switched off there, so the two AI pictures show the answers the model gave to the same inputs in the evaluation.
 
 ### The matrix
 
 One page for everyone and everything. Green is fine, orange needs a look, red is too late. The clip says there is a certificate behind it.
 
 ![The skill matrix: persons as rows, skills as columns, each cell with status, level and end date](docs/images/matrix.png)
+
+### Ask it a question
+
+Type what you want to know. The AI turns the question into filters, and the app tells you how it understood you. It never sees your persons.
+
+![A question typed into the Ask field, and the matrix filtered to the one person who has both skills](docs/images/ask.png)
 
 ### One dialog for an assignment
 
@@ -29,6 +37,12 @@ Click a cell. Level, dates and certificates are in one place, and nothing is sav
 PDFs and images open right in the app. No download, no searching through folders.
 
 ![A certificate shown inside the app](docs/images/certificate.png)
+
+### Let it read the certificate
+
+Upload a certificate and press "Read dates". The AI proposes the dates, the code checks them, and you decide. Here it also noticed that the paper belongs to someone else.
+
+![The assignment dialog with the dates read from a certificate and a note that it is issued to another person](docs/images/read-dates.png)
 
 ### Everything about one person
 
@@ -56,7 +70,7 @@ The page I would open every Monday. Soonest first, for the next 30 to 180 days, 
 
 ### My skills
 
-For the technicians themselves. Pick your name once and see what you hold. Read-only.
+For the technicians themselves. Type your name once and see what you hold. Read-only.
 
 ![The read-only view of one technician](docs/images/my-skills.png)
 
