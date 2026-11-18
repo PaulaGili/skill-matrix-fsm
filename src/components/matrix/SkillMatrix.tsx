@@ -1,19 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
-import {
-  AnalyticalTable,
-  AnalyticalTableHooks,
-  Button,
-  IllustratedMessage,
-  Link,
-  Title,
-  ToolbarButton,
-  type AnalyticalTableCellInstance,
-  type AnalyticalTableColumnDefinition,
-} from "@ui5/webcomponents-react";
+import { Button, IllustratedMessage, Title, ToolbarButton } from "@ui5/webcomponents-react";
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { BulkAssignDialog } from "@/components/assignment/BulkAssignDialog";
 import shell from "@/components/common/AppShell.module.css";
@@ -25,36 +15,16 @@ import { LoadError, Loading } from "@/components/common/LoadState";
 import { useToast } from "@/components/common/useToast";
 import { useAiEnabled } from "@/hooks/useAiEnabled";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import {
-  HELD_TODAY,
-  buildCells,
-  cellPasses,
-  cellKey,
-  filterPersons,
-  filterSkills,
-  inColumnOrder,
-  personPasses,
-  skillsWithMatches,
-  sortRank,
-  type CellFilter,
-  levelNamesOf,
-} from "@/lib/domain/matrix";
+import { HELD_TODAY, cellKey, filterPersons, inColumnOrder, sortRank, type CellFilter } from "@/lib/domain/matrix";
 import { matrixTable } from "@/lib/domain/export";
-import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Person, Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { AskMatrix } from "./AskMatrix";
-import { MatrixCell } from "./MatrixCell";
 import { MatrixFilters } from "./MatrixFilters";
+import { MatrixTable } from "./MatrixTable";
 import { useColumnOrder } from "./useColumnOrder";
-import styles from "./SkillMatrix.module.css";
-
-const VISIBLE_ROWS = 15;
-// Keeps the person column in place while the skills scroll sideways. Despite its name this
-// is a table plugin factory, not a React hook, so it is created once outside the component.
-const { useStickyColumns: stickyColumns } = AnalyticalTableHooks;
-const TABLE_HOOKS = [stickyColumns()];
+import { useMatrixView } from "./useMatrixView";
 
 export function SkillMatrix() {
   const router = useRouter();
@@ -71,7 +41,6 @@ export function SkillMatrix() {
   const { toastElement, showToast } = useToast();
   const aiEnabled = useAiEnabled();
   const { t } = useI18n();
-  const today = todayIso();
 
   // Selecting the first skill switches on Valid and Expiring soon: "who can do this today?".
   function selectSkills(ids: string[]) {
@@ -82,35 +51,9 @@ export function SkillMatrix() {
     setSkillIds(ids);
   }
 
-  // A selected skill that was deleted in the meantime no longer filters.
-  const skillIds = useMemo(() => pickedSkillIds.filter((id) => data?.skills.some((skill) => skill.id === id)), [pickedSkillIds, data]);
-
-  const cells = useMemo(
-    () => buildCells(data?.assignments ?? [], new Set(data?.certificates.map((certificate) => certificate.assignmentId)), today),
-    [data, today],
-  );
-  const selectedSkills = useMemo(() => filterSkills(data?.skills ?? [], skillIds), [data, skillIds]);
-
-  const levelNames = useMemo(() => levelNamesOf(data?.assignments ?? []), [data]);
-
-  const filters = useMemo(() => ({ statuses: statusFilters, levels }), [statusFilters, levels]);
-
+  const { skillIds, cells, levelNames, filters, persons, skills } = useMatrixView(data, { search, pickedSkillIds, showSystemUsers, statusFilters, levels });
   const { columnOrder, moveColumn } = useColumnOrder(data?.skills ?? []);
-
-  const searched = useMemo(() => filterPersons(data?.persons ?? [], search, showSystemUsers), [data, search, showSystemUsers]);
-
-  const persons = useMemo(() => {
-    const allSkillIds = (data?.skills ?? []).map((skill) => skill.id);
-    return searched.filter((person) => personPasses(person.id, skillIds, allSkillIds, cells, filters));
-  }, [data, searched, skillIds, cells, filters]);
-
-  // The columns: the selected skills, or with a status or level filter on, only the skills
-  // in which a shown person has a matching cell.
-  const skills = useMemo(() => {
-    if (skillIds.length > 0) return selectedSkills;
-    const personIds = persons.map((person) => person.id);
-    return skillsWithMatches(selectedSkills, personIds, cells, filters);
-  }, [selectedSkills, skillIds, persons, cells, filters]);
+  const selectCell = useCallback((person: Person, skill: Skill) => setSelected({ person, skill }), []);
 
   // Sorted from the Sort button like the other tables. A skill puts the problems first:
   // expired, expiring soon, then valid, then the persons without the skill.
@@ -120,54 +63,6 @@ export function SkillMatrix() {
     ...Object.fromEntries(skills.map((skill) => [skill.id, (person: Person) => sortRank(cells.get(cellKey(person.id, skill.id)))])),
   });
   const sortColumns: SortColumn[] = [{ key: "person", label: "field.person" }, ...skills.map((skill) => ({ key: skill.id, text: skill.name }))];
-
-  const columns = useMemo<AnalyticalTableColumnDefinition[]>(
-    () => [
-      {
-        Header: t("field.person"),
-        id: "person",
-        accessor: "displayName",
-        sticky: "start",
-        disableSticky: true,
-        disableDragAndDrop: true,
-        width: 208,
-        vAlign: "Middle",
-        Cell: ({ row }: AnalyticalTableCellInstance) => {
-          const person = row.original as Person;
-          return (
-            <span className={styles.person}>
-              <Link accessibleRole="Button" accessibleName={t("person.openLabel", { name: person.displayName })} onClick={() => setShownPerson(person)}>
-                {person.displayName}
-              </Link>
-              {!person.isTechnician && <span className={styles.detail}>{t("matrix.systemUser")}</span>}
-            </span>
-          );
-        },
-      },
-      ...skills.map((skill): AnalyticalTableColumnDefinition => ({
-        Header: skill.name,
-        id: skill.id,
-        accessor: (person) => cellKey(person.id, skill.id),
-        disableSticky: true,
-        minWidth: 162,
-        hAlign: "Center",
-        vAlign: "Middle",
-        Cell: ({ row }: AnalyticalTableCellInstance) => {
-          const person = row.original as Person;
-          const cell = cells.get(cellKey(person.id, skill.id));
-          return (
-            <MatrixCell
-              cell={cell}
-              filteredOut={cell !== undefined && !cellPasses(cell, filters)}
-              label={`${person.displayName}, ${skill.name}`}
-              onSelect={() => setSelected({ person, skill })}
-            />
-          );
-        },
-      })),
-    ],
-    [skills, cells, filters, t],
-  );
 
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
@@ -248,24 +143,16 @@ export function SkillMatrix() {
             }}
           />
 
-          <AnalyticalTable
-            columns={columns}
-            data={sortedPersons}
-            tableHooks={TABLE_HOOKS}
+          <MatrixTable
+            persons={sortedPersons}
+            skills={skills}
+            cells={cells}
+            filters={filters}
             loading={loading}
-            visibleRows={VISIBLE_ROWS}
-            minRows={1}
-            rowHeight={52}
-            sortable={false}
             columnOrder={columnOrder}
-            onColumnsReorder={(event) => {
-              // The event is the browser's drop event with the table's details added. The dragged
-              // and the target column are read from it, as the details do not name the target.
-              // The browser test for dragging guards this against a change in the table library.
-              const drop = event as unknown as DragEvent;
-              moveColumn(drop.dataTransfer?.getData("text") ?? "", (drop.currentTarget as HTMLElement).dataset.columnId ?? "");
-            }}
-            noDataText={t("matrix.noPersons")}
+            onMoveColumn={moveColumn}
+            onPerson={setShownPerson}
+            onCell={selectCell}
           />
         </>
       )}

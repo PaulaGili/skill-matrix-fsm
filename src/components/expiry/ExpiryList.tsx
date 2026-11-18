@@ -2,25 +2,9 @@
 
 import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
-import {
-  Button,
-  CheckBox,
-  FilterGroupItem,
-  IllustratedMessage,
-  Option,
-  Select,
-  Table,
-  TableCell,
-  TableHeaderCell,
-  TableHeaderRow,
-  TableRow,
-  Text,
-  Title,
-  ToolbarButton,
-} from "@ui5/webcomponents-react";
+import { IllustratedMessage, Title, ToolbarButton } from "@ui5/webcomponents-react";
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { CertificateDialog } from "@/components/assignment/CertificateDialog";
-import { PageFilters, pickFilter, searchFilter } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { PageToolbar } from "@/components/common/PageToolbar";
 import { LoadError, Loading } from "@/components/common/LoadState";
@@ -33,6 +17,8 @@ import { formatDate, todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Assignment, Person, Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { EXPIRED, ExpiryFilters, NO_FILTER } from "./ExpiryFilters";
+import { ExpiryTable } from "./ExpiryTable";
 import { RenewDialog } from "./RenewDialog";
 
 const SORT_COLUMNS: SortColumn[] = [
@@ -43,20 +29,13 @@ const SORT_COLUMNS: SortColumn[] = [
   { key: "certificate", label: "field.certificate" },
 ];
 
-// 0 stands for what has already expired.
-const EXPIRED = 0;
-const WINDOWS = [30, 60, 90, 180, EXPIRED];
-
 // What runs out soon, soonest first, or what has already expired. The edit button of a row
 // opens the same dialog as a matrix cell, so an assignment can be renewed from here. Ticked
 // rows are renewed together.
 export function ExpiryList() {
   const { data, error, loading, reload } = useAsyncData(loadMatrixData);
-  const [days, setDays] = useState(WINDOWS[0]);
-  const [search, setSearch] = useState("");
-  const [pickedSkillIds, setSkillIds] = useState<string[]>([]);
-  const [levels, setLevels] = useState<string[]>([]);
-  const [certificateFilter, setCertificateFilter] = useState<string[]>([]);
+  const [filter, setFilter] = useState(NO_FILTER);
+  const { days, search, levels, certificate: certificateFilter } = filter;
   const [selected, setSelected] = useState<{ assignment: Assignment; person: Person; skill: Skill } | null>(null);
   const [viewed, setViewed] = useState<Assignment | null>(null);
   const [tickedIds, setTickedIds] = useState<string[]>([]);
@@ -68,7 +47,7 @@ export function ExpiryList() {
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
   const today = todayIso();
-  const skillIds = pickedSkillIds.filter((id) => data.skills.some((s) => s.id === id));
+  const skillIds = filter.skillIds.filter((id) => data.skills.some((s) => s.id === id));
   const persons = filterPersons(data.persons, search, true);
   const person = (assignment: Assignment) => persons.find((p) => p.id === assignment.personId);
   const skill = (assignment: Assignment) => data.skills.find((s) => s.id === assignment.skillId);
@@ -97,6 +76,7 @@ export function ExpiryList() {
     return t(message.key, message.params);
   };
   const levelNames = levelNamesOf(data.assignments);
+  const title = t(days === EXPIRED ? "expiry.titleExpired" : "expiry.title", { count: rows.length });
   // Only rows that are still listed count: a filter or a reload can take a ticked row away.
   const ticked = rows.filter((assignment) => tickedIds.includes(assignment.id));
   const tick = (id: string) => setTickedIds(tickedIds.includes(id) ? tickedIds.filter((ticked) => ticked !== id) : [...tickedIds, id]);
@@ -116,7 +96,7 @@ export function ExpiryList() {
   return (
     <div className={shell.panel}>
       <div className={shell.header}>
-        <Title level="H3">{t(days === EXPIRED ? "expiry.titleExpired" : "expiry.title", { count: rows.length })}</Title>
+        <Title level="H3">{title}</Title>
         <PageToolbar
           name="expiring-assignments"
           getRows={exportRows}
@@ -141,53 +121,7 @@ export function ExpiryList() {
       </div>
       {error && <LoadError message={error} onRetry={reload} />}
 
-      <PageFilters
-        active={search !== "" || skillIds.length > 0 || levels.length > 0 || certificateFilter.length > 0}
-        onClear={() => {
-          setSearch("");
-          setSkillIds([]);
-          setLevels([]);
-          setCertificateFilter([]);
-        }}
-      >
-        <FilterGroupItem filterKey="period" label={t("expiry.period")} className={shell.filterItem}>
-          <Select id="expiry-window" accessibleName={t("expiry.period")} onChange={(event) => setDays(Number(event.detail.selectedOption.dataset.days))}>
-            {WINDOWS.map((window) => (
-              <Option key={window} data-days={window} selected={window === days}>
-                {window === EXPIRED ? t("expiry.expired") : t("expiry.days", { count: window })}
-              </Option>
-            ))}
-          </Select>
-        </FilterGroupItem>
-        {searchFilter({ filterKey: "person", label: t("field.person"), placeholder: t("filter.searchPerson"), value: search, onChange: setSearch })}
-        {pickFilter({
-          filterKey: "skills",
-          label: t("field.skill"),
-          placeholder: t("filter.bySkills"),
-          options: data.skills.map((s) => ({ key: s.id, text: s.name })),
-          selected: skillIds,
-          onChange: setSkillIds,
-        })}
-        {pickFilter({
-          filterKey: "level",
-          label: t("field.level"),
-          placeholder: t("filter.byLevel"),
-          options: levelNames.map((name) => ({ key: name, text: name })),
-          selected: levels,
-          onChange: setLevels,
-        })}
-        {pickFilter({
-          filterKey: "certificate",
-          label: t("field.certificate"),
-          placeholder: t("filter.byCertificate"),
-          options: [
-            { key: "with", text: t("filter.withCertificate") },
-            { key: "without", text: t("filter.noCertificate") },
-          ],
-          selected: certificateFilter,
-          onChange: setCertificateFilter,
-        })}
-      </PageFilters>
+      <ExpiryFilters value={{ ...filter, skillIds }} skills={data.skills} levelNames={levelNames} onChange={setFilter} />
 
       {rows.length === 0 ? (
         <IllustratedMessage
@@ -196,82 +130,18 @@ export function ExpiryList() {
           subtitleText={days === EXPIRED ? t("expiry.emptyExpiredText") : t("expiry.emptyText", { count: days })}
         />
       ) : (
-        <Table
+        <ExpiryTable
+          title={title}
+          rows={rows.map((assignment) => ({ assignment, person: person(assignment)!, skill: skill(assignment)! }))}
           loading={loading}
-          accessibleName={t(days === EXPIRED ? "expiry.titleExpired" : "expiry.title", { count: rows.length })}
-          overflowMode="Popin"
-          headerRow={
-            <TableHeaderRow>
-              <TableHeaderCell width="3rem" importance={2} />
-              <TableHeaderCell minWidth="7rem" importance={2} sortIndicator={sort.indicator("validTo")}>
-                {t("field.validTo")}
-              </TableHeaderCell>
-              <TableHeaderCell minWidth="7rem">{t("expiry.ends")}</TableHeaderCell>
-              <TableHeaderCell minWidth="9rem" importance={2} sortIndicator={sort.indicator("person")}>
-                {t("field.person")}
-              </TableHeaderCell>
-              <TableHeaderCell minWidth="9rem" importance={1} sortIndicator={sort.indicator("skill")}>
-                {t("field.skill")}
-              </TableHeaderCell>
-              <TableHeaderCell minWidth="7rem" importance={-1} popinHidden sortIndicator={sort.indicator("level")}>
-                {t("field.level")}
-              </TableHeaderCell>
-              <TableHeaderCell minWidth="6.5rem" importance={-1} popinHidden sortIndicator={sort.indicator("certificate")}>
-                {t("field.certificate")}
-              </TableHeaderCell>
-              <TableHeaderCell width="4.5rem" horizontalAlign="End" importance={2}>
-                {t("field.actions")}
-              </TableHeaderCell>
-            </TableHeaderRow>
-          }
-        >
-          {rows.map((assignment) => (
-            <TableRow key={assignment.id} rowKey={assignment.id}>
-              <TableCell>
-                <CheckBox
-                  accessibleName={t("renew.select", { skill: skill(assignment)!.name, person: person(assignment)!.displayName })}
-                  checked={tickedIds.includes(assignment.id)}
-                  onChange={() => tick(assignment.id)}
-                />
-              </TableCell>
-              <TableCell>
-                <Text>{formatDate(assignment.endDate!)}</Text>
-              </TableCell>
-              <TableCell>
-                <Text>{due(assignment)}</Text>
-              </TableCell>
-              <TableCell>
-                <Text>{person(assignment)!.displayName}</Text>
-              </TableCell>
-              <TableCell>
-                <Text>{skill(assignment)!.name}</Text>
-              </TableCell>
-              <TableCell>
-                <Text>{assignment.levelName ?? ""}</Text>
-              </TableCell>
-              <TableCell>
-                {hasCertificate(assignment) && (
-                  <Button
-                    design="Transparent"
-                    icon="attachment"
-                    tooltip={t("certificate.showPreview")}
-                    accessibleName={t("expiry.showCertificate", { person: person(assignment)!.displayName, skill: skill(assignment)!.name })}
-                    onClick={() => setViewed(assignment)}
-                  />
-                )}
-              </TableCell>
-              <TableCell horizontalAlign="End">
-                <Button
-                  design="Transparent"
-                  icon="edit"
-                  accessibleName={t("expiry.editLabel", { skill: skill(assignment)!.name, person: person(assignment)!.displayName })}
-                  tooltip={t("expiry.editTooltip")}
-                  onClick={() => setSelected({ assignment, person: person(assignment)!, skill: skill(assignment)! })}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </Table>
+          sort={sort}
+          tickedIds={tickedIds}
+          dueOf={due}
+          hasCertificate={hasCertificate}
+          onTick={tick}
+          onView={setViewed}
+          onEdit={setSelected}
+        />
       )}
 
       {selected && (
