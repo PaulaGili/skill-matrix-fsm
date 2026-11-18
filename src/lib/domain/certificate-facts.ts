@@ -3,7 +3,6 @@ import { formatDate, isIsoDate } from "./status";
 // What the AI reads from a certificate. Every field can be missing.
 export interface CertificateFacts {
   holderName: string | null;
-  title: string | null;
   validFrom: string | null;
   validTo: string | null;
 }

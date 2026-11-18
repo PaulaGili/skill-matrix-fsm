@@ -47,7 +47,7 @@ run(async () => {
   const employees = (await listActivePersons())
     .filter((person) => person.isTechnician)
     .sort((a, b) => a.displayName.localeCompare(b.displayName) || a.id.localeCompare(b.id));
-  const existing = indexAssignments(await listAssignments());
+  const existing = indexAssignments(await listAssignments(), todayIso());
   const withCertificate = new Set((await listCertificates()).map((certificate) => certificate.assignmentId));
 
   for (const row of ASSIGNMENTS) {

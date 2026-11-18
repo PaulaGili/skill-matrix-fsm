@@ -19,6 +19,7 @@
     "e2e": "playwright test",
     "gate": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && node scripts/ci/check-bundle.mjs && npm run e2e",
     "check:fsm": "node --env-file=.env.local scripts/check-connection.mjs",
+    "eval:ai": "tsx --env-file=.env.local tests/ai-eval/run.ts",
     "smoke": "tsx --env-file=.env.local tests/fsm-smoke.ts",
     "seed": "tsx --env-file=.env.local scripts/fsm/seed.ts",
     "cleanup": "tsx --env-file=.env.local scripts/fsm/cleanup.ts"

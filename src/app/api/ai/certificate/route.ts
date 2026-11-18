@@ -5,8 +5,9 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { CertificateNotReadError, readCertificate } from "@/lib/ai/read-certificate";
-import { checkCertificateFile } from "@/lib/domain/certificate";
+import { MAX_CERTIFICATE_BYTES, checkCertificateFile } from "@/lib/domain/certificate";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ function overLimit(): boolean {
   return ++reads > MAX_READS_PER_HOUR;
 }
 
+const Body = z.object({ fileName: z.string().min(1).max(255), base64: z.string().min(1) });
+
 const enabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status });
 
@@ -32,8 +35,11 @@ export function GET() {
 
 export async function POST(request: Request) {
   if (!enabled()) return fail(503, "Reading certificates with AI is not configured.");
-  const { fileName, base64 } = (await request.json()) as { fileName?: string; base64?: string };
-  if (!fileName || !base64) return fail(400, "fileName and base64 are required.");
+  // Base64 is a third larger than the file, so anything above this cannot be a valid upload.
+  if (Number(request.headers.get("content-length")) > MAX_CERTIFICATE_BYTES * 1.5) return fail(413, "The file is larger than 5 MB.");
+  const body = Body.safeParse(await request.json().catch(() => null));
+  if (!body.success) return fail(400, "fileName and base64 are required.");
+  const { fileName, base64 } = body.data;
   const check = checkCertificateFile(fileName, Buffer.byteLength(base64, "base64"));
   if (!check.ok) return fail(400, check.error);
   if (overLimit()) return fail(429, "Too many certificates were read in the last hour. Try again later.");

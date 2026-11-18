@@ -23,13 +23,14 @@ export function matrixTable(
   ];
 }
 
-// A spreadsheet runs a cell that starts with one of these as a formula. Skill names are
-// typed by users, so such a value gets a leading apostrophe and stays text.
+// A spreadsheet that opens a CSV file runs a cell that starts with one of these as a formula.
+// Skill names are typed by users, so such a value gets a leading apostrophe and stays text.
+// An Excel file stores text cells as text and does not need this.
 export function safeCell(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 
-export function toCsv(rows: string[][]): string {
-  const quote = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value);
-  return rows.map((row) => row.map((value) => quote(safeCell(value))).join(",")).join("\r\n");
+export function toCsv(rows: string[][], separator = ","): string {
+  const quote = (value: string) => (/["\r\n]/.test(value) || value.includes(separator) ? `"${value.replaceAll('"', '""')}"` : value);
+  return rows.map((row) => row.map((value) => quote(safeCell(value))).join(separator)).join("\r\n");
 }

@@ -1,7 +1,8 @@
 // Saves everything the assignment dialog collects, in this order: the assignment itself,
 // certificates marked for deletion, then new certificates.
 import { createAssignment, updateAssignment, type AssignmentInput } from "./assignments";
-import { deleteCertificates, uploadCertificates, type CertificateUpload } from "./certificates";
+import { todayIso } from "@/lib/domain/status";
+import { deleteCertificates, uploadCertificates, type CertificateUpload, type UploadFailure } from "./certificates";
 import type { Assignment } from "./model";
 
 export interface AssignmentChanges {
@@ -14,14 +15,20 @@ function inputChanged(loaded: Assignment, input: AssignmentInput): boolean {
   return loaded.levelId !== input.levelId || loaded.startDate !== (input.startDate || null) || loaded.endDate !== (input.endDate || null);
 }
 
-// `loaded` is undefined for a new assignment. Returns one message per upload that failed.
-export async function saveAssignment(skillId: string, personId: string, loaded: Assignment | undefined, changes: AssignmentChanges): Promise<string[]> {
-  let assignmentId = loaded?.id;
-  if (!loaded) {
-    assignmentId = (await createAssignment(skillId, personId, changes.input)).id;
-  } else if (inputChanged(loaded, changes.input)) {
-    await updateAssignment(skillId, loaded, changes.input);
+export interface SaveResult {
+  saved: Assignment; // the assignment as it is now, the base for the next save
+  failures: UploadFailure[];
+}
+
+// `loaded` is undefined for a new assignment.
+export async function saveAssignment(skillId: string, personId: string, loaded: Assignment | undefined, changes: AssignmentChanges): Promise<SaveResult> {
+  let saved = loaded;
+  if (!saved) {
+    saved = await createAssignment(skillId, personId, changes.input);
+  } else if (inputChanged(saved, changes.input)) {
+    await updateAssignment(skillId, saved, changes.input);
+    saved = { ...saved, levelId: changes.input.levelId, startDate: changes.input.startDate || todayIso(), endDate: changes.input.endDate || null };
   }
   await deleteCertificates(changes.deleteCertificateIds);
-  return uploadCertificates(skillId, assignmentId!, changes.uploads);
+  return { saved, failures: await uploadCertificates(skillId, saved.id, changes.uploads) };
 }

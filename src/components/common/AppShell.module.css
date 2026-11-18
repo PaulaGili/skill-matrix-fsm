@@ -1,6 +1,8 @@
 .main {
   padding: 1rem 2rem;
   display: grid;
+  /* Without minmax(0, ...) a wide table stretches the page instead of scrolling or folding. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 
@@ -12,6 +14,7 @@
 
 .panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   padding: 1rem;
   background: var(--sapGroup_ContentBackground);
@@ -21,4 +24,15 @@
 .logo {
   width: 1.75rem;
   height: 1.75rem;
+}
+
+/* Tablet and smaller: less margin around the content. */
+@media (max-width: 64rem) {
+  .main {
+    padding: 0.75rem 1rem;
+  }
+
+  .footer {
+    padding: 0 1rem 1rem;
+  }
 }

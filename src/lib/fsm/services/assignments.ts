@@ -59,35 +59,61 @@ function validDates(input: AssignmentInput): { startDate: string; endDate: strin
   return { startDate, endDate };
 }
 
-export async function createAssignment(skillId: string, personId: string, input: AssignmentInput): Promise<Assignment> {
-  const { startDate, endDate } = validDates(input);
-  const skill = await requireOwnSkill(skillId);
-  const body = [
-    {
-      tagId: skill.id,
-      technician: personId,
-      startDate,
-      ...(endDate ? { endDate } : {}),
-      ...(input.levelId ? { proficiencyId: input.levelId } : {}),
-    },
-  ];
-  const [created] = assertBulkOk<SkillServiceSkill>(await skillApi("v2/skills", { method: "POST", body }));
-  return toAssignment(created);
+export const MAX_BULK_ASSIGNMENTS = 20;
+
+// One request for all persons, each with its own dates. The assessment rules allow a few
+// dozen records at most. A person who already has the skill is refused, so a retry or a
+// second browser tab cannot create a duplicate.
+export async function createAssignments(skillId: string, inputs: (AssignmentInput & { personId: string })[]): Promise<Assignment[]> {
+  if (inputs.length > MAX_BULK_ASSIGNMENTS) throw new Error(`At most ${MAX_BULK_ASSIGNMENTS} persons can be assigned at once.`);
+  const dates = inputs.map(validDates);
+  const [skill, existing] = await Promise.all([requireOwnSkill(skillId), listAssignments()]);
+  const taken = inputs.filter((input) => existing.some((a) => a.skillId === skill.id && a.personId === input.personId));
+  if (taken.length > 0) {
+    throw new Error(`${taken.length === 1 ? "This person already has" : `${taken.length} of these persons already have`} ${skill.name}. Reload and try again.`);
+  }
+  const body = inputs.map((input, index) => ({
+    tagId: skill.id,
+    technician: input.personId,
+    startDate: dates[index].startDate,
+    ...(dates[index].endDate ? { endDate: dates[index].endDate } : {}),
+    ...(input.levelId ? { proficiencyId: input.levelId } : {}),
+  }));
+  const created = assertBulkOk<SkillServiceSkill>(await skillApi("v2/skills", { method: "POST", body })).map(toAssignment);
+
+  // FSM gives a new skill the default level of the scale, even when none is sent. "No level"
+  // therefore needs a second call that clears it.
+  for (const [index, assignment] of created.entries()) {
+    if (inputs[index].levelId || !assignment.levelId) continue;
+    await patchAssignment(skill.id, assignment.id, null, dates[index]);
+    created[index] = { ...assignment, levelId: null, levelName: null, level: null };
+  }
+  return created;
 }
 
-// `loaded` is the assignment as the user saw it. If FSM's record changed since then, the update
-// is refused. FSM ignores a new end date on an open-ended skill unless validityType changes
-// with it (LF = date range, PE = no end). The PATCH returns no body, so callers reload.
+export async function createAssignment(skillId: string, personId: string, input: AssignmentInput): Promise<Assignment> {
+  const [created] = await createAssignments(skillId, [{ ...input, personId }]);
+  return created;
+}
+
+// FSM ignores a new end date on an open-ended skill unless validityType changes with it
+// (LF = date range, PE = no end). The PATCH returns no body.
+async function patchAssignment(tagId: string, id: string, levelId: string | null, dates: { startDate: string; endDate: string | null }): Promise<void> {
+  await skillApi(`v1/tags/${tagId}/skills/${id}`, {
+    method: "PATCH",
+    body: { proficiencyId: levelId, startDate: dates.startDate, endDate: dates.endDate ?? OPEN_END_DATE, validityType: dates.endDate ? "LF" : "PE" },
+  });
+}
+
+// `loaded` is the assignment as the user saw it. If FSM's record changed since then, the
+// update is refused.
 export async function updateAssignment(skillId: string, loaded: Assignment, input: AssignmentInput): Promise<void> {
   const { startDate, endDate } = validDates(input);
   const { skill, assignments } = await requireOwnAssignments(skillId, [loaded.id]);
   const [current] = assignments;
   if (current.startDate !== loaded.startDate || current.endDate !== loaded.endDate || current.levelId !== loaded.levelId) throw new ConflictError();
 
-  await skillApi(`v1/tags/${skill.id}/skills/${loaded.id}`, {
-    method: "PATCH",
-    body: { proficiencyId: input.levelId, startDate, endDate: endDate ?? OPEN_END_DATE, validityType: endDate ? "LF" : "PE" },
-  });
+  await patchAssignment(skill.id, loaded.id, input.levelId, { startDate, endDate });
 }
 
 export async function endAssignments(skillId: string, assignmentIds: string[], endDate: string): Promise<void> {

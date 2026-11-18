@@ -44,17 +44,22 @@ export async function listCertificates(): Promise<Certificate[]> {
   return toCertificates(await fsmQuery<AttachmentRow>(sql, ["Attachment", "Skill", "Tag"]));
 }
 
-// Uploads the files one by one and returns a message for each file that failed, so one bad
-// file does not stop the others.
-export async function uploadCertificates(skillId: string, assignmentId: string, files: CertificateUpload[]): Promise<string[]> {
+export interface UploadFailure {
+  index: number; // position in the list of files that was passed in
+  message: string;
+}
+
+// Uploads the files one by one and reports each file that failed, so one bad file does not
+// stop the others.
+export async function uploadCertificates(skillId: string, assignmentId: string, files: CertificateUpload[]): Promise<UploadFailure[]> {
   if (files.length === 0) return [];
   await requireOwnAssignments(skillId, [assignmentId]);
 
-  const failures: string[] = [];
-  for (const file of files) {
+  const failures: UploadFailure[] = [];
+  for (const [index, file] of files.entries()) {
     const check = checkCertificateFile(file.fileName, file.sizeBytes);
     if (!check.ok) {
-      failures.push(check.error);
+      failures.push({ index, message: check.error });
       continue;
     }
     try {
@@ -66,19 +71,18 @@ export async function uploadCertificates(skillId: string, assignmentId: string, 
         object: { objectId: assignmentId, objectType: "SKILL" },
       });
     } catch (error) {
-      failures.push(`${file.fileName}: ${toUserMessage(error)}`);
+      failures.push({ index, message: `${file.fileName}: ${toUserMessage(error)}` });
     }
   }
   return failures;
 }
 
-// Only ids that FSM lists on one of our skills can be deleted.
+// Only ids that FSM lists on one of our skills are deleted. Any other id is skipped: it was
+// deleted in the meantime or it is not ours.
 export async function deleteCertificates(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const own = new Set((await listCertificates()).map((certificate) => certificate.id));
-  const foreign = ids.find((id) => !own.has(id));
-  if (foreign) throw new OwnershipError(`Certificate ${foreign} is not linked to one of your skills.`);
-  for (const id of ids) await fsmDelete("Attachment", id);
+  for (const id of ids.filter((id) => own.has(id))) await fsmDelete("Attachment", id);
 }
 
 export async function deleteCertificatesOf(assignmentIds: string[]): Promise<void> {

@@ -1,0 +1,14 @@
+.columns {
+  display: grid;
+  min-width: 18rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.separator {
+  margin-top: 0.75rem;
+}
+
+.column {
+  margin-left: 1.5rem;
+}

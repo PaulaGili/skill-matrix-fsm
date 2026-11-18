@@ -48,6 +48,7 @@ export interface FsmCall {
 // Answers the proxy calls of the app in the browser and records them.
 export async function mockFsm(page: Page, options: { fail?: boolean } = {}): Promise<FsmCall[]> {
   const calls: FsmCall[] = [];
+  await page.route("**/api/health", (route) => route.fulfill({ json: { ok: true, companyName: "Mock" } }));
   await page.route("**/api/fsm/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace("/api/fsm/", "");
@@ -63,6 +64,8 @@ export async function mockFsm(page: Page, options: { fail?: boolean } = {}): Pro
       const created = { ...skill("A9", body[0].tagId, "First Aid", body[0].technician, body[0].endDate, 1), startDate: body[0].startDate };
       return route.fulfill({ status: 207, json: { hasErrors: false, results: [{ status: 201, resource: created }] } });
     }
+    // Like FSM, the mock gives a new skill the default level, and a PATCH answers with no body.
+    if (request.method() === "PATCH" && /^skill\/v1\/tags\/[^/]+\/skills\/[^/]+$/.test(path)) return route.fulfill({ status: 200, body: "" });
     return route.fulfill({ status: 404, json: { message: `Not mocked: ${path}` } });
   });
   return calls;

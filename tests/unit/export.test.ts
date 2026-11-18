@@ -42,6 +42,10 @@ describe("toCsv", () => {
     expect(toCsv([["Bieri, Marco", 'say "hi"', "plain"]])).toBe('"Bieri, Marco","say ""hi""",plain');
   });
 
+  it("uses another separator and quotes values that contain it", () => {
+    expect(toCsv([["Bieri, Marco", "a;b", "plain"]], ";")).toBe('Bieri, Marco;"a;b";plain');
+  });
+
   it("separates rows with CRLF", () => {
     expect(toCsv([["a"], ["b"]])).toBe("a\r\nb");
   });

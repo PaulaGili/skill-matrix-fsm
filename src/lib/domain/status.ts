@@ -52,9 +52,11 @@ export function validityHint(validity: Validity, status: AssignmentStatus): stri
 }
 
 // Returns a message for the user, or null when the dates are fine. Both dates are optional.
-export function validateValidity(startDate: string | null, endDate: string | null): string | null {
+// An empty "valid from" is saved as today, so "valid to" cannot be in the past then.
+export function validateValidity(startDate: string | null, endDate: string | null, today = todayIso()): string | null {
   if (startDate && !isIsoDate(startDate)) return "Valid from is not a valid date.";
   if (endDate && !isIsoDate(endDate)) return "Valid to is not a valid date.";
+  if (!startDate && endDate && endDate < today) return "Valid to is in the past. Enter the valid from date as well.";
   if (startDate && endDate && endDate < startDate) return "Valid to must not be before valid from.";
   return null;
 }

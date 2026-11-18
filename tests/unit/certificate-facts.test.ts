@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkFacts } from "@/lib/domain/certificate-facts";
 
 const TODAY = "2026-11-17";
-const facts = { holderName: "Marco Bieri", title: "Welding certificate", validFrom: "2026-01-01", validTo: "2027-12-31" };
+const facts = { holderName: "Marco Bieri", validFrom: "2026-01-01", validTo: "2027-12-31" };
 
 describe("checkFacts", () => {
   it("passes clean facts through without notes", () => {

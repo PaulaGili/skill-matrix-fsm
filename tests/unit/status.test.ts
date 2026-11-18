@@ -84,6 +84,12 @@ describe("validateValidity", () => {
     expect(validateValidity("2026-02-01", "2026-01-31")).toMatch(/must not be before/);
   });
 
+  it("rejects an end date in the past when the start is empty, because empty means today", () => {
+    expect(validateValidity(null, "2026-11-10", "2026-11-17")).toMatch(/in the past/);
+    expect(validateValidity(null, "2026-11-17", "2026-11-17")).toBeNull();
+    expect(validateValidity("2026-01-01", "2026-11-10", "2026-11-17")).toBeNull();
+  });
+
   it("rejects malformed dates", () => {
     expect(validateValidity("2026-13-01", null)).toMatch(/Valid from/);
     expect(validateValidity(null, "tomorrow")).toMatch(/Valid to/);

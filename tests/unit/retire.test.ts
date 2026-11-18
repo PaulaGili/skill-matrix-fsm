@@ -12,10 +12,10 @@ describe("splitForRetire", () => {
   const startsToday = validity(TODAY, null);
   const startsLater = validity("2026-12-01", "2027-12-01");
 
-  it("ends what is valid today and removes what has not started before today", () => {
+  it("ends what is valid today, including what started today, and removes what starts later", () => {
     const { toEnd, toRemove } = splitForRetire([open, endsLater, endsToday, alreadyEnded, startsToday, startsLater], TODAY);
-    expect(toEnd).toEqual([open, endsLater, endsToday]);
-    expect(toRemove).toEqual([startsToday, startsLater]);
+    expect(toEnd).toEqual([open, endsLater, endsToday, startsToday]);
+    expect(toRemove).toEqual([startsLater]);
   });
 
   it("leaves assignments that already ended alone", () => {
