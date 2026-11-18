@@ -18,6 +18,7 @@ const PAGES = [
 ] as const;
 
 const LANGUAGES: Language[] = ["en", "de"];
+const COMPACT_KEY = "view:compact";
 
 // The answer of /api/health, or null while it is loading.
 function useHealth(): { ok: boolean; companyName?: string } | null {
@@ -41,10 +42,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { language, setLanguage, t } = useI18n();
   const [helpOpen, setHelpOpen] = useState(false);
 
-  // SAP recommends the compact size for a mouse and the larger one for touch.
+  // The larger size is the default, as it is easier to read and to hit. The compact size
+  // shows more rows and is remembered in this browser for those who choose it.
   useEffect(() => {
-    document.body.toggleAttribute("data-ui5-compact-size", window.matchMedia("(pointer: fine)").matches);
+    try {
+      document.body.toggleAttribute("data-ui5-compact-size", localStorage.getItem(COMPACT_KEY) === "1");
+    } catch {}
   }, []);
+
+  function toggleSize() {
+    const compact = document.body.toggleAttribute("data-ui5-compact-size");
+    try {
+      localStorage.setItem(COMPACT_KEY, compact ? "1" : "0");
+    } catch {}
+  }
 
   let connection = "";
   if (DEMO_MODE) connection = t("shell.demoData");
@@ -56,6 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <ShellBar
         primaryTitle={t("app.title")}
         secondaryTitle={connection}
+        onLogoClick={() => router.push("/")}
         logo={<Icon name="wrench" design="Information" className={styles.logo} />}
         assistant={
           <SegmentedButton
@@ -70,6 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </SegmentedButton>
         }
       >
+        <ShellBarItem icon="resize" text={t("shell.size")} onClick={toggleSize} />
         <ShellBarItem icon="sys-help" text={t("shell.help")} onClick={() => setHelpOpen(true)} />
       </ShellBar>
       <TabContainer collapsed onTabSelect={(event) => router.push(event.detail.tab.dataset.path ?? "/")}>

@@ -1,10 +1,9 @@
 // Takes a change back by writing the opposite change to FSM. It goes through the same
 // services as any other save, so the ownership and conflict checks apply.
 import type { Change, Snapshot } from "@/lib/domain/history";
-import { ConflictError, createAssignment, listAssignments, updateAssignment } from "@/lib/fsm/services/assignments";
+import { ConflictError, createAssignment, deleteAssignments, listAssignments, updateAssignment } from "@/lib/fsm/services/assignments";
 import { listCertificates } from "@/lib/fsm/services/certificates";
 import type { Assignment } from "@/lib/fsm/services/model";
-import { removeAssignments } from "@/lib/fsm/services/remove";
 import { UserError } from "@/lib/i18n/translate";
 
 const asAssignment = (change: Change, snapshot: Snapshot): Assignment => ({
@@ -23,7 +22,8 @@ async function removeUnchanged(change: Change, created: Snapshot): Promise<void>
   const same = current && current.levelId === created.levelId && current.startDate === created.startDate && current.endDate === created.endDate;
   if (!same) throw new ConflictError();
   if (certificates.some((certificate) => certificate.assignmentId === change.assignmentId)) throw new UserError({ key: "history.hasCertificates" });
-  await removeAssignments(change.skillId, [change.assignmentId]);
+  // Only the assignment is deleted. A certificate that arrived in the meantime is not touched.
+  await deleteAssignments(change.skillId, [change.assignmentId]);
 }
 
 // Answers with the new assignment when undoing a removal created one.

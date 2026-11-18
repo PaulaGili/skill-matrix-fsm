@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { columnsFromHeaders, guessColumns, parseCsv, parseDate, toImportRows, unusedHeaders, type ImportContext } from "@/lib/domain/import";
+import { columnsFromHeaders, guessColumns, parseCsv, parseDate, toImportRows, unusedColumns, withProposed, type ImportContext } from "@/lib/domain/import";
 
 describe("guessColumns and columnsFromHeaders", () => {
   it("finds the usual titles in English and German", () => {
     expect(guessColumns(["Person", "Skill", "Level", "Valid from", "Valid to"])).toEqual({ person: 0, skill: 1, level: 2, validFrom: 3, validTo: 4 });
     expect(guessColumns(["Qualifikation", "Mitarbeiter", "Gültig bis"])).toEqual({ person: 1, skill: 0, level: null, validFrom: null, validTo: 2 });
     expect(guessColumns(["Wer", "Was"]).person).toBeNull();
-    expect(unusedHeaders(["Person", "Skill", "Ablauf", ""], guessColumns(["Person", "Skill", "Ablauf", ""]))).toEqual(["Ablauf"]);
+    expect(unusedColumns(["Person", "Skill", "Ablauf", ""], guessColumns(["Person", "Skill", "Ablauf", ""]))).toEqual([2]);
+    // The AI saw only the left-over columns 1 and 2. Its answer fills open fields and never moves person.
+    const guessed = guessColumns(["Name", "Name", "Was"]);
+    const proposed = { person: 0, skill: 1, level: null, validFrom: null, validTo: null };
+    expect(withProposed(guessed, proposed, [1, 2])).toMatchObject({ person: 0, skill: 2 });
   });
 
   it("accepts only headers of the sheet from the AI", () => {
@@ -24,6 +28,11 @@ describe("parseCsv and parseDate", () => {
       ["Bieri, Marco", "Welding"],
     ]);
     expect(parseCsv('Person;Skill\n"say ""hi""";First Aid')[1]).toEqual(['say "hi"', "First Aid"]);
+    // A separator inside quotes does not decide, and a space may come before a quote.
+    expect(parseCsv('"Name, Vorname";Qualifikation\n"Bieri, Marco"; "First Aid; basic"')).toEqual([
+      ["Name, Vorname", "Qualifikation"],
+      ["Bieri, Marco", "First Aid; basic"],
+    ]);
     // A line break inside quotes, a quote inside a value and old Mac line ends.
     expect(parseCsv('A;B\r"one\ntwo";5" pipe\r')).toEqual([
       ["A", "B"],
@@ -94,6 +103,11 @@ describe("toImportRows", () => {
       [3, null],
       [4, "import.noPerson"],
     ]);
+  });
+
+  it("matches a name typed with a separate accent mark", () => {
+    const people = { ...context, persons: [{ id: "p9", displayName: "M\u00fcller, Sarah", isTechnician: true }] };
+    expect(toImportRows([["Sarah Mu\u0308ller", "Welding", "", "", ""]], columns, people)[0].personId).toBe("p9");
   });
 
   it("flags the second row for the same person and skill", () => {

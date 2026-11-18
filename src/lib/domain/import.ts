@@ -43,10 +43,21 @@ export function columnsFromHeaders(answer: Record<ImportField, string | null>, h
   return findColumns(headers, (field) => [clean(answer[field])]);
 }
 
-// The titles of the columns that no field uses, to tell the user what is ignored.
-export function unusedHeaders(headers: string[], columns: ColumnMap): string[] {
+// The columns with a title that no field uses yet, by their position in the sheet.
+export function unusedColumns(headers: string[], columns: ColumnMap): number[] {
   const used = Object.values(columns);
-  return headers.filter((header, column) => header.trim() !== "" && !used.includes(column));
+  return headers.flatMap((header, column) => (header.trim() !== "" && !used.includes(column) ? [column] : []));
+}
+
+// Fills the fields that are still open from a second column map, which the AI gave for the
+// left-over columns only. `left` says which sheet column each of its positions stands for.
+export function withProposed(columns: ColumnMap, proposed: ColumnMap, left: number[]): ColumnMap {
+  const result = { ...columns };
+  for (const field of IMPORT_FIELDS) {
+    const position = proposed[field];
+    if (result[field] === null && position !== null) result[field] = left[position];
+  }
+  return result;
 }
 
 // Excel puts this invisible mark at the start of a CSV file.
@@ -56,8 +67,9 @@ const BYTE_ORDER_MARK = String.fromCharCode(0xfeff);
 // separator, a line break and doubled quotes. Empty lines stay, so row numbers match the file.
 export function parseCsv(text: string): string[][] {
   const content = text.replace(BYTE_ORDER_MARK, "").replace(/\r\n?/g, "\n");
-  const firstLine = content.split("\n")[0];
-  const separator = firstLine.split(";").length > firstLine.split(",").length ? ";" : ",";
+  // The separator is the one found more often in the first line, outside quotes.
+  const firstLine = content.split("\n")[0].replace(/"[^"]*"/g, "");
+  const separator = firstLine.split(";").length >= firstLine.split(",").length ? ";" : ",";
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -69,8 +81,10 @@ export function parseCsv(text: string): string[][] {
       i++;
     } else if (quoted && char === '"') quoted = false;
     else if (quoted) cell += char;
-    else if (char === '"' && cell === "") quoted = true;
-    else if (char === separator || char === "\n") {
+    else if (char === '"' && cell.trim() === "") {
+      quoted = true;
+      cell = "";
+    } else if (char === separator || char === "\n") {
       row.push(cell);
       cell = "";
       if (char === "\n") {
@@ -118,6 +132,7 @@ export interface ImportRow {
 // Letters and digits of a name in a fixed order, so "Marco Bieri" equals "Bieri, Marco".
 const words = (text: string) =>
   text
+    .normalize("NFC")
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)

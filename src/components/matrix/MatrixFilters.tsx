@@ -23,70 +23,70 @@ interface Props {
   onSkillIds: (ids: string[]) => void;
   onLevels: (levels: string[]) => void;
   onStatusFilters: (filters: CellFilter[]) => void;
+  onClearAll: () => void;
 }
 
 export function MatrixFilters(props: Props) {
-  const { skills, levelNames, search, skillIds, levels, statusFilters, onSearch, onSkillIds, onLevels, onStatusFilters } = props;
+  const { skills, levelNames, search, skillIds, levels, statusFilters, onSearch, onSkillIds, onLevels, onStatusFilters, onClearAll } = props;
+  const anyFilter = search !== "" || skillIds.length > 0 || levels.length > 0 || statusFilters.length > 0;
   const { t } = useI18n();
   return (
-    <>
-      <div className={styles.filters}>
-        <Input
-          className={styles.search}
-          placeholder={t("filter.searchPerson")}
-          accessibleName={t("filter.searchPerson")}
-          showClearIcon
-          icon={<Icon name="search" />}
-          value={search}
-          onInput={(event) => onSearch(event.target.value)}
-        />
+    <div className={styles.filters}>
+      <Input
+        className={styles.search}
+        placeholder={t("filter.searchPerson")}
+        accessibleName={t("filter.searchPerson")}
+        showClearIcon
+        icon={<Icon name="search" />}
+        value={search}
+        onInput={(event) => onSearch(event.target.value)}
+      />
+      <MultiComboBox
+        className={styles.skills}
+        placeholder={t("filter.bySkills")}
+        accessibleName={t("filter.bySkills")}
+        title={t("filter.bySkillsHelp")}
+        onSelectionChange={(event) => onSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
+      >
+        {skills.map((skill) => (
+          <MultiComboBoxItem key={skill.id} text={skill.name} data-id={skill.id} selected={skillIds.includes(skill.id)} />
+        ))}
+      </MultiComboBox>
+      {levelNames.length > 0 && (
         <MultiComboBox
-          className={styles.skills}
-          placeholder={t("filter.bySkills")}
-          accessibleName={t("filter.bySkills")}
-          title={t("filter.bySkillsHelp")}
-          onSelectionChange={(event) => onSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
+          className={styles.levels}
+          placeholder={t("filter.byLevel")}
+          accessibleName={t("filter.byLevel")}
+          onSelectionChange={(event) => onLevels(event.detail.items.map((item) => item.text ?? ""))}
         >
-          {skills.map((skill) => (
-            <MultiComboBoxItem key={skill.id} text={skill.name} data-id={skill.id} selected={skillIds.includes(skill.id)} />
+          {levelNames.map((name) => (
+            <MultiComboBoxItem key={name} text={name} selected={levels.includes(name)} />
           ))}
         </MultiComboBox>
-        {levelNames.length > 0 && (
-          <MultiComboBox
-            className={styles.levels}
-            placeholder={t("filter.byLevel")}
-            accessibleName={t("filter.byLevel")}
-            onSelectionChange={(event) => onLevels(event.detail.items.map((item) => item.text ?? ""))}
-          >
-            {levelNames.map((name) => (
-              <MultiComboBoxItem key={name} text={name} selected={levels.includes(name)} />
-            ))}
-          </MultiComboBox>
+      )}
+      <span className={styles.inline} role="group" aria-label={t("filter.showOnlyGroup")}>
+        <Label>{t("filter.showOnly")}</Label>
+        {CELL_FILTERS.map((filter) => {
+          const active = statusFilters.includes(filter);
+          const label = filterLabel(filter, t);
+          return (
+            <ToggleButton
+              key={filter}
+              tooltip={t(`filterHelp.${filter}`)}
+              pressed={active}
+              accessibleName={t(active ? "filter.on" : "filter.off", { label })}
+              onClick={() => onStatusFilters(active ? statusFilters.filter((other) => other !== filter) : [...statusFilters, filter])}
+            >
+              {label}
+            </ToggleButton>
+          );
+        })}
+        {anyFilter && (
+          <Button design="Attention" icon="clear-filter" onClick={onClearAll}>
+            {t("filter.clear")}
+          </Button>
         )}
-        <span className={styles.inline} role="group" aria-label={t("filter.showOnlyGroup")}>
-          <Label>{t("filter.showOnly")}</Label>
-          {CELL_FILTERS.map((filter) => {
-            const active = statusFilters.includes(filter);
-            const label = filterLabel(filter, t);
-            return (
-              <ToggleButton
-                key={filter}
-                tooltip={t(`filterHelp.${filter}`)}
-                pressed={active}
-                accessibleName={t(active ? "filter.on" : "filter.off", { label })}
-                onClick={() => onStatusFilters(active ? statusFilters.filter((other) => other !== filter) : [...statusFilters, filter])}
-              >
-                {label}
-              </ToggleButton>
-            );
-          })}
-          {statusFilters.length > 0 && (
-            <Button design="Transparent" icon="clear-filter" onClick={() => onStatusFilters([])}>
-              {t("filter.clear")}
-            </Button>
-          )}
-        </span>
-      </div>
-    </>
+      </span>
+    </div>
   );
 }

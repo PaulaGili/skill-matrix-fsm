@@ -20,6 +20,24 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* The title and the actions share a line and fold below each other on a narrow screen. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+@media (max-width: 40rem) {
+  .search,
+  .skills,
+  .levels {
+    width: 100%;
+  }
 }

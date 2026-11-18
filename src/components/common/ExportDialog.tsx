@@ -84,6 +84,7 @@ export function ExportButton({ name, getRows, onError }: Props) {
   return (
     <>
       <Button
+        design="Transparent"
         icon="download"
         tooltip={t("export.tooltip")}
         onClick={() => {

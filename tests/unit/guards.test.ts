@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAssignments, requireOwnAssignments } from "@/lib/fsm/services/assignments";
+import { createAssignments, endAssignments, requireOwnAssignments } from "@/lib/fsm/services/assignments";
 import { deleteCertificates } from "@/lib/fsm/services/certificates";
 import { OwnershipError } from "@/lib/fsm/services/ownership";
 import { removeAssignments } from "@/lib/fsm/services/remove";
+import { saveAssignment } from "@/lib/fsm/services/save-assignment";
 import { requireOwnSkill } from "@/lib/fsm/services/skills";
 import { undoChange } from "@/lib/history/undo";
 
@@ -98,5 +99,37 @@ describe("undoChange for a new assignment", () => {
     await expect(undoChange(assigned("A1", "2025-06-01"))).rejects.toThrow("changed");
     await expect(undoChange(assigned("A-gone", "2026-01-01"))).rejects.toThrow("changed");
     expect(writes).toEqual([]);
+  });
+});
+
+describe("endAssignments", () => {
+  it("says how many assignments were ended when FSM fails halfway, and keeps the cause when none was", async () => {
+    const fetchOk = globalThis.fetch;
+    const second = skill("A2", "T1", "tester::Welding");
+    let patches = 0;
+    vi.stubGlobal("fetch", (url: string, init: RequestInit = {}) => {
+      if (url.includes("skills/search")) return Promise.resolve(new Response(JSON.stringify({ content: [...SKILLS, second], last: true })));
+      if (init.method === "PATCH" && ++patches > 1) return Promise.reject(new Error("down"));
+      return fetchOk(url, init);
+    });
+    await expect(endAssignments("T1", ["A1", "A2"], () => "2026-11-16")).rejects.toThrow("1 of 2 assignments were ended");
+    await expect(endAssignments("T1", ["A1"], () => "2026-11-16")).rejects.toThrow("down");
+  });
+});
+
+describe("saveAssignment", () => {
+  const upload = { fileName: "a.pdf", sizeBytes: 10, base64: "AA==" };
+  const unchanged = { levelId: null, startDate: "2026-01-01", endDate: null };
+
+  it("uploads nothing to an assignment that is not ours", async () => {
+    const foreign = { id: "A9", skillId: "T1", personId: "P1", level: null, levelName: null, ...unchanged };
+    await expect(saveAssignment("T1", "P1", foreign, { input: unchanged, deleteCertificateIds: [], uploads: [upload] })).rejects.toThrow(OwnershipError);
+    expect(writes).toEqual([]);
+  });
+
+  it("uploads to our own assignment after one check", async () => {
+    const own = { id: "A1", skillId: "T1", personId: "P1", level: null, levelName: null, ...unchanged };
+    await saveAssignment("T1", "P1", own, { input: unchanged, deleteCertificateIds: [], uploads: [upload] });
+    expect(writes).toEqual(["POST data/v4/Attachment"]);
   });
 });

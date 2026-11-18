@@ -24,7 +24,7 @@ The app uses the words of the assignment: Skill (FSM Tag), Assignment (FSM Skill
 
 ## Writes in the shared company
 
-The proxy limits which entities can be written, but it cannot know whose tag it is. Every update and delete therefore takes an id, reads the record back from FSM and checks that it is in our namespace before writing. The check reads our skills and assignments again, which is two or three list calls per save. That is fine at this size; with much more data it would read the single record instead.
+The proxy limits which entities can be written, but it cannot know whose tag it is. Every update and delete therefore takes an id, reads the record back from FSM and checks that it is in our namespace before writing. The check reads our skills and assignments again. A save does this once: creating or updating the assignment checks it, and the certificate upload in the same save reuses that check. With much more data it would read the single record instead.
 
 Scripts (`seed`, `cleanup`, the smoke test) go through the app's proxy as well, so the same write rules apply to them.
 
@@ -49,7 +49,7 @@ Deleting a skill in the catalogue:
 - A certificate can be previewed inside the dialog. FSM serves attachments as downloads, so the file is fetched and shown from memory instead of pointing an iframe at the URL.
 - FSM silently ignores a new end date on an open-ended skill (it answers 200 and keeps `9999-12-31`) unless `validityType` changes with it: `LF` for a date range, `PE` for no end date. `updateAssignment` always sends both. The smoke test covers both directions.
 
-- FSM gives a new skill the default level of its scale, even when no level is sent. Choosing "No level" therefore creates the skill and then clears the level with a second call. The smoke test covers this.
+- FSM gives a new skill the default level of its scale, even when no level is sent. Choosing "No level" therefore creates the skill and then clears the level with a second call. If that second call fails, the assignment keeps the default level and the matrix shows it, which is what FSM holds. The smoke test covers the normal case.
 
 ## Concurrent edits
 
@@ -76,13 +76,16 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
   - With a filter on, a cell that does not pass is left blank, so "No certificate" does not show the same person's certified skills next to the uncertified one.
 - The screen follows "overview first, then filter, then detail": a line above the table says how many assignments are expired, expiring soon or without a certificate among all technicians, and a click on a number sets that filter. All filters sit in one bar, and the status filters are toggle buttons.
 - Cells of persons who do not have a skill are empty. A dash in every one of them made the least important thing the most visible; "Assign" appears when the pointer or the keyboard is on the cell.
-- Content density follows the SAP guideline: compact for a mouse, the larger size for touch.
+- The larger SAP size is the default, because the users are not all young and some work on a tablet. A button in the header switches to the compact size, with smaller fields and buttons, and the choice is remembered in the browser. The rows of the matrix keep their height, as a cell has two lines.
+- A click on a person opens a read-only list of all skills of that person with level, status, validity and certificates. It uses the data the matrix has already loaded, so it costs no FSM call.
+- A row starts with a red line when one of the shown skills of that person has expired, and an orange one when something expires soon.
+- The catalogue shows per skill how many assignments are expired, expiring soon, valid or not yet valid, in the colours of the matrix.
 - A click on a column header sorts the rows. A skill column puts the problems first (expired, expiring soon), then valid, then the persons without the skill. The skill columns can be dragged into another order, which is remembered in the browser.
 - FSM allows two skills for the same person and tag. The app reads the assignments before it creates one and refuses a second one, so a retry or a second browser tab does not duplicate an assignment. Two saves in the same second could still both pass the check, as FSM itself has no such rule. If FSM holds two anyway, the cell shows the one that is valid today, and among equals the one that stays valid longest.
 - The "Expiring" page lists what ends within the next 30, 60, 90 or 180 days, soonest first, from the same four calls as the matrix. A row opens the same dialog as a matrix cell, so an assignment can be renewed where the problem is seen. Expired assignments are not listed there; the matrix filter covers them. It has the same person, skill, level and missing-certificate filters as the matrix and can be exported the same way.
 - Export downloads the matrix as it is shown, with the active filters, as Excel or CSV. The columns and the CSV separator can be chosen first, and the choice is remembered in the browser. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
 
-- Tablet: the matrix keeps its person column in place and scrolls the skills inside the table, so the page itself never scrolls sideways. The list tables (catalogue, expiring) fold the columns that do not fit into the row. Checked at 820 px width.
+- Tablet: the matrix keeps its person column in place and scrolls the skills inside the table, so the page itself never scrolls sideways. The list tables (catalogue, expiring) fold the columns that do not fit into the row. Checked at 820 px width. On a phone the pages fold the same way and the dialog shows its fields below each other, checked at 390 px; the matrix itself stays a wide table that scrolls sideways, so a phone is fine for looking something up, not for working in it.
 
 ## Reading a certificate with AI
 
@@ -92,9 +95,10 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
 - The certificate is also checked against what is stored: a note appears when the AI says it is clearly for another skill, or when a date printed on it differs from the date of the assignment. Only a date that is on the certificate is compared.
 - When a skill is created, the AI is asked once whether the catalogue already has one that means the same (a translation or another word). Only skill names are sent, an answer counts only if that skill exists, and the user can still create the skill.
+- Two models are used. Reading a scanned certificate runs on the strong model. The three short text tasks (question to filters, similar skill name, column titles) run on the small model, which is faster and costs a fraction. The evaluation is the check that the small model is good enough for them.
 - The key stays on the server, like the FSM secret, and the bundle check covers it. The file is only sent when the user clicks the button, and there is a cap on reads per hour. The cap is counted in memory per server, and the AI routes do not ask who is calling, so a hosted copy needs an access code in front of it.
 - The answer is requested as structured output, so its shape is guaranteed by the API and not parsed from free text.
-- `npm run eval:ai` reads five invented certificates (English, German, an image, one without dates and one with an instruction hidden in the text) and compares the answers with the known ones. It calls the real service, so it is run by hand and not in CI. Last run: 15 of 15 fields correct, about 2 seconds per file. Five clean files do not show how it copes with a poor scan.
+- `npm run eval:ai` reads five invented certificates (English, German, an image, one without dates and one with an instruction hidden in the text) and compares the answers with the known ones. It calls the real service, so it is run by hand and not in CI. Last run: 20 of 20 fields correct, about 2 seconds per file. Five clean files do not show how it copes with a poor scan.
 
 ## Asking the matrix a question
 
@@ -102,7 +106,7 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The AI turns the question into filter values and nothing else. It does not answer and it never sees persons or assignments: only the question and the names of skills and levels are sent. A browser test checks the request.
 - The code keeps only names and statuses that exist, tells the user what was left out, and the matrix computes the result with the same tested filter rules as a manual filter. A wrong answer from the AI can therefore only produce a wrong filter, which is visible and can be changed by hand.
 - A question about a skill that does not exist sets no filter at all and says which name was not found. The first version left the unknown skill out and kept the rest, so "who is certified for diving?" showed everyone with any valid skill. The evaluation found that.
-- `npm run eval:ai` also runs six questions with known filters, including German, a skill that does not exist and an instruction hidden in the question. The same question can get a different answer the next time, so `npm run eval:ai -- 3` asks each one three times and only counts it when all three match. Last run: 6 of 6 questions correct in all three runs. Before the fix above it was 4 of 6.
+- `npm run eval:ai` also runs six questions with known filters, including German, a skill that does not exist and an instruction hidden in the question. The same question can get a different answer the next time, so `npm run eval:ai -- 3` asks each one three times and only counts it when all three match. Last run: 6 of 6 questions correct in all three runs. Before the fix above it was 4 of 6. The same command checks six skill names against the catalogue and the column titles of five import files; last run 6 of 6 and 5 of 5 in all three runs, on the small model.
 
 ## Importing assignments from a file
 
@@ -153,4 +157,5 @@ The import writes one request per skill through the same service as the dialogs,
 - Browser tests (Playwright) run against the production build with FSM mocked in the browser, so CI needs no credentials and never writes to the shared company. One of them checks that the matrix loads with four FSM calls.
 - `npm run smoke` exercises the service layer against the real company and deletes what it created.
 - Two review agents live in `.claude/agents`: a code reviewer and an evaluator that scores the repository against the assignment. Both are read-only. Their findings were checked against the code before anything was changed.
+- `package.json` forces a newer `minimatch` inside the TypeScript lint parser, because the version it asks for has a known advisory. It is a development tool only. The other `npm install` warnings come from `picomatch`, for which no fixed version exists yet; `npm audit --omit=dev` reports nothing.
 - `npm run seed` creates 5 skills, 10 assignments and 4 sample certificates with dates relative to today, and skips what already exists. `npm run cleanup` only lists unless called with `-- --yes`.

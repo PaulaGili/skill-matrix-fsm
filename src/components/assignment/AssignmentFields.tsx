@@ -70,6 +70,8 @@ export function LevelField({ scaleId, value, disabled, onChange }: Props) {
 
 // Valid from and valid to. `idPrefix` keeps the field ids unique when the fields are shown per person.
 export function ValidityFields({ value, disabled, onChange, idPrefix = "valid" }: Omit<Props, "scaleId"> & { idPrefix?: string }) {
+  // The hint is shown once, not under the dates of every person.
+  const withHint = idPrefix === "valid";
   const { t } = useI18n();
   const error = fieldsError(value);
   const dateError = error ? t(error.key, error.params) : null;
@@ -110,10 +112,12 @@ export function ValidityFields({ value, disabled, onChange, idPrefix = "valid" }
           />
         </div>
       </div>
-      {dateError && (
+      {dateError ? (
         <Text className={styles.error} role="alert">
           {dateError}
         </Text>
+      ) : (
+        withHint && <Text className={styles.hint}>{t("field.datesHint")}</Text>
       )}
     </>
   );

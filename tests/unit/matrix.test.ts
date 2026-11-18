@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  inColumnOrder,
   buildCells,
   cellKey,
   HELD_TODAY,
@@ -185,5 +186,17 @@ describe("summarize and sortRank", () => {
     expect(rank("p1", "s2")).toBeLessThan(rank("p2", "s1"));
     expect(rank("p2", "s1")).toBeLessThan(rank("p1", "s1"));
     expect(rank("p1", "s1")).toBeLessThan(rank("p3", "s1"));
+  });
+});
+
+describe("inColumnOrder", () => {
+  const skill = (id: string) => ({ id });
+
+  it("puts the skills in the dragged order and new skills after them", () => {
+    const ids = (list: { id: string }[], order: string[]) => inColumnOrder(list, order).map((s) => s.id);
+    expect(ids([skill("A"), skill("B"), skill("C")], ["C", "A", "B"])).toEqual(["C", "A", "B"]);
+    expect(ids([skill("A"), skill("B")], [])).toEqual(["A", "B"]);
+    // F is new and E was dragged to the end of five: E stays before F, as in the table.
+    expect(ids([skill("E"), skill("F")], ["A", "B", "C", "D", "E"])).toEqual(["E", "F"]);
   });
 });

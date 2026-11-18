@@ -55,7 +55,11 @@ export interface UploadFailure {
 export async function uploadCertificates(skillId: string, assignmentId: string, files: CertificateUpload[]): Promise<UploadFailure[]> {
   if (files.length === 0) return [];
   await requireOwnAssignments(skillId, [assignmentId]);
+  return uploadToChecked(assignmentId, files);
+}
 
+// For an assignment that this save has just created or checked, so it is not read again.
+export async function uploadToChecked(assignmentId: string, files: CertificateUpload[]): Promise<UploadFailure[]> {
   const failures: UploadFailure[] = [];
   for (const [index, file] of files.entries()) {
     const check = checkCertificateFile(file.fileName, file.sizeBytes);

@@ -37,6 +37,16 @@ export function filterSkills<S extends { id: string }>(skills: S[], selectedIds:
   return selectedIds.length === 0 ? skills : skills.filter((skill) => selectedIds.includes(skill.id));
 }
 
+// The skills in the order the user dragged the columns into. A skill that is not in the
+// stored order yet goes after the others, as the table shows it.
+export function inColumnOrder<S extends { id: string }>(skills: S[], columnOrder: string[]): S[] {
+  const position = (skill: S, index: number) => (columnOrder.includes(skill.id) ? columnOrder.indexOf(skill.id) : columnOrder.length + index);
+  return skills
+    .map((skill, index) => ({ skill, position: position(skill, index) }))
+    .sort((a, b) => a.position - b.position)
+    .map(({ skill }) => skill);
+}
+
 export function cellKey(personId: string, skillId: string): string {
   return `${personId}|${skillId}`;
 }

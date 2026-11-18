@@ -18,7 +18,17 @@ import {
 } from "@ui5/webcomponents-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { matchImportColumns } from "@/lib/ai/client";
-import { IMPORT_FIELDS, MAX_IMPORT_ROWS, guessColumns, isEmptyRow, parseCsv, toImportRows, unusedHeaders, type ColumnMap } from "@/lib/domain/import";
+import {
+  IMPORT_FIELDS,
+  MAX_IMPORT_ROWS,
+  guessColumns,
+  isEmptyRow,
+  parseCsv,
+  toImportRows,
+  unusedColumns,
+  withProposed,
+  type ColumnMap,
+} from "@/lib/domain/import";
 import { formatDate } from "@/lib/domain/status";
 import { toUserMessage } from "@/lib/fsm/errors";
 import { createAssignments } from "@/lib/fsm/services/assignments";
@@ -97,15 +107,13 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
         // the titles alone, and it only fills fields that are still open.
         let columns = guessColumns(headers);
         let byAi = false;
-        const left = unusedHeaders(headers, columns);
+        const left = unusedColumns(headers, columns);
         if (aiEnabled && left.length > 0 && Object.values(columns).includes(null)) {
-          const proposed = await matchImportColumns(left);
-          for (const field of IMPORT_FIELDS) {
-            const column = proposed[field];
-            if (columns[field] !== null || column === null) continue;
-            columns = { ...columns, [field]: headers.indexOf(left[column]) };
-            byAi = true;
-          }
+          // If the AI cannot be reached, the import goes on with what the code recognised.
+          const proposed = await matchImportColumns(left.map((column) => headers[column])).catch(() => null);
+          const filled = proposed ? withProposed(columns, proposed, left) : columns;
+          byAi = IMPORT_FIELDS.some((field) => filled[field] !== columns[field]);
+          columns = filled;
         }
         if (columns.person === null || columns.skill === null) setError(t("import.noColumns"));
         else setSheet({ headers, rows: body, columns, byAi });
@@ -142,6 +150,7 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
     }
   }
 
+  const notUsed = sheet ? unusedColumns(sheet.headers, sheet.columns).map((column) => sheet.headers[column]) : [];
   const usedColumns = sheet
     ? IMPORT_FIELDS.filter((field) => sheet.columns[field] !== null)
         .map((field) => sheet.headers[sheet.columns[field]!])
@@ -188,9 +197,9 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
             <Text>
               {t("import.columns", { columns: usedColumns })} {sheet.byAi && t("import.columnsByAi")}
             </Text>
-            {unusedHeaders(sheet.headers, sheet.columns).length > 0 && (
+            {notUsed.length > 0 && (
               <MessageStrip design="Critical" hideCloseButton>
-                {t("import.notUsed", { columns: unusedHeaders(sheet.headers, sheet.columns).join(", ") })}
+                {t("import.notUsed", { columns: notUsed.join(", ") })}
               </MessageStrip>
             )}
             <Table

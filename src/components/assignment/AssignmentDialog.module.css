@@ -90,3 +90,15 @@
   display: grid;
   gap: 0.25rem;
 }
+
+/* Phone: the two dates go below each other, so nothing is cut off. */
+@media (max-width: 40rem) {
+  .form {
+    width: 100%;
+  }
+
+  .dates {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
