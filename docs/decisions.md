@@ -74,7 +74,11 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
   - With skills selected, a person needs a passing cell in every selected skill. Selecting the first skill switches on "Valid" and "Expiring soon", which answers "who can do Welding and First Aid today?". The default is visible and can be changed: "Welding" plus "Expired" shows whose welding has expired, and with all statuses off everyone is listed, which is the view for assigning the skill to someone new.
   - Without skills selected, one passing cell in any skill is enough, and the columns without a passing cell are hidden so the result is not a grid of dashes.
   - With a filter on, a cell that does not pass is left blank, so "No certificate" does not show the same person's certified skills next to the uncertified one.
-- FSM allows two skills for the same person and tag. The app refuses to create a second one, so a retry or a second browser tab cannot duplicate an assignment. If FSM holds two anyway, the cell shows the one that is valid today, and among equals the one that stays valid longest.
+- The screen follows "overview first, then filter, then detail": a line above the table says how many assignments are expired, expiring soon or without a certificate among all technicians, and a click on a number sets that filter. All filters sit in one bar, and the status filters are toggle buttons.
+- Cells of persons who do not have a skill are empty. A dash in every one of them made the least important thing the most visible; "Assign" appears when the pointer or the keyboard is on the cell.
+- Content density follows the SAP guideline: compact for a mouse, the larger size for touch.
+- A click on a column header sorts the rows. A skill column puts the problems first (expired, expiring soon), then valid, then the persons without the skill. The skill columns can be dragged into another order, which is remembered in the browser.
+- FSM allows two skills for the same person and tag. The app reads the assignments before it creates one and refuses a second one, so a retry or a second browser tab does not duplicate an assignment. Two saves in the same second could still both pass the check, as FSM itself has no such rule. If FSM holds two anyway, the cell shows the one that is valid today, and among equals the one that stays valid longest.
 - The "Expiring" page lists what ends within the next 30, 60, 90 or 180 days, soonest first, from the same four calls as the matrix. A row opens the same dialog as a matrix cell, so an assignment can be renewed where the problem is seen. Expired assignments are not listed there; the matrix filter covers them. It has the same person, skill, level and missing-certificate filters as the matrix and can be exported the same way.
 - Export downloads the matrix as it is shown, with the active filters, as Excel or CSV. The columns and the CSV separator can be chosen first, and the choice is remembered in the browser. The file is built in the browser, so no data leaves the app. Values that a spreadsheet would run as a formula (a skill named `=...`) are written as text.
 
@@ -86,7 +90,9 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The AI only reads: holder name, title and the two dates, each of which may be "not found". It is told not to guess or calculate, and to treat the document as data.
 - The code decides what is usable. Dates must be real dates in the right order, and it adds a note when the certificate has expired or is issued to someone else. These checks are pure functions with unit tests.
 - The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
-- The key stays on the server, like the FSM secret, and the bundle check covers it. The file is only sent when the user clicks the button, and there is a cap on reads per hour.
+- The certificate is also checked against what is stored: a note appears when the AI says it is clearly for another skill, or when a date printed on it differs from the date of the assignment. Only a date that is on the certificate is compared.
+- When a skill is created, the AI is asked once whether the catalogue already has one that means the same (a translation or another word). Only skill names are sent, an answer counts only if that skill exists, and the user can still create the skill.
+- The key stays on the server, like the FSM secret, and the bundle check covers it. The file is only sent when the user clicks the button, and there is a cap on reads per hour. The cap is counted in memory per server, and the AI routes do not ask who is calling, so a hosted copy needs an access code in front of it.
 - The answer is requested as structured output, so its shape is guaranteed by the API and not parsed from free text.
 - `npm run eval:ai` reads five invented certificates (English, German, an image, one without dates and one with an instruction hidden in the text) and compares the answers with the known ones. It calls the real service, so it is run by hand and not in CI. Last run: 15 of 15 fields correct, about 2 seconds per file. Five clean files do not show how it copes with a poor scan.
 
@@ -97,6 +103,14 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The code keeps only names and statuses that exist, tells the user what was left out, and the matrix computes the result with the same tested filter rules as a manual filter. A wrong answer from the AI can therefore only produce a wrong filter, which is visible and can be changed by hand.
 - A question about a skill that does not exist sets no filter at all and says which name was not found. The first version left the unknown skill out and kept the rest, so "who is certified for diving?" showed everyone with any valid skill. The evaluation found that.
 - `npm run eval:ai` also runs six questions with known filters, including German, a skill that does not exist and an instruction hidden in the question. The same question can get a different answer the next time, so `npm run eval:ai -- 3` asks each one three times and only counts it when all three match. Last run: 6 of 6 questions correct in all three runs. Before the fix above it was 4 of 6.
+
+## Importing assignments from a file
+
+Assignments can be created from an Excel or CSV file, up to 20 rows, the same limit as assigning to several persons. The file is read in the browser. Every row is matched by code to a technician, a skill and a level, and the dates are checked with the same rules as the dialog. A row that does not match exactly, that the person already has, or that is in the file twice is shown with the reason and cannot be imported. The user sees all rows and unticks what should not be saved.
+
+The usual column titles in English and German are recognised by code. Titles that are left over, and nothing else, are sent to the AI, which answers with the title for each field that is still open. An answer that is not one of the titles in the file is dropped, and a column that no field uses is named in a warning above the rows. No row of the file leaves the browser.
+
+The import writes one request per skill through the same service as the dialogs, so the namespace check and the duplicate check apply. If one request fails, the rows saved before it show as already assigned after the reload.
 
 ## Demo mode
 
@@ -122,6 +136,15 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - Read-only by design: it has four tools and none of them writes. It reads through the app's proxy like the other scripts, so it needs no credentials of its own.
 - The answers are built by pure functions on top of the same rules as the app (status, expiry window, which assignment counts), with unit tests. The assistant gets facts and does not calculate a status itself.
 - Unlike the two AI features in the app, this one does hand person data to the assistant that is connected. That is the purpose, and the user chooses which assistant to connect.
+
+## History of changes
+
+- The "Changes" page lists what was assigned, edited or removed, newest first, with Undo.
+- FSM offers the app no change log and the app has no database, so the history is kept in the browser. It therefore covers the changes made in this browser only, and the page says so.
+- The description of a change is built by the code from the old and new values. An AI would add nothing here and would need person names.
+- Undo writes the opposite change through the same services as any save, so the ownership and conflict checks apply: if someone changed the assignment afterwards, undo is refused. Only the latest change of an assignment can be undone, because undoing an older one would overwrite a later change. Certificates deleted with an assignment do not come back, and the list says how many were lost. Undoing a new assignment deletes it, so it is refused once the assignment has a certificate or was changed.
+- The history holds person names in the browser storage of that computer, which matters on a shared machine.
+- Changes to the catalogue are not in the history.
 
 ## Tooling
 

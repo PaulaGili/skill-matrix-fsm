@@ -82,11 +82,17 @@ export async function createAssignments(skillId: string, inputs: (AssignmentInpu
 
   // FSM gives a new skill the default level of the scale, even when none is sent. "No level"
   // therefore needs a second call that clears it.
+  let notCleared = 0;
   for (const [index, assignment] of created.entries()) {
     if (inputs[index].levelId || !assignment.levelId) continue;
-    await patchAssignment(skill.id, assignment.id, null, dates[index]);
-    created[index] = { ...assignment, levelId: null, levelName: null, level: null };
+    try {
+      await patchAssignment(skill.id, assignment.id, null, dates[index]);
+      created[index] = { ...assignment, levelId: null, levelName: null, level: null };
+    } catch {
+      notCleared++;
+    }
   }
+  if (notCleared > 0) throw new UserError({ key: "error.levelNotCleared", params: { count: notCleared, level: created[0].levelName ?? "" } });
   return created;
 }
 

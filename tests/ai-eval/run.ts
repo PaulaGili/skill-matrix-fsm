@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { questionToAnswer } from "@/lib/ai/question";
 import { readCertificate } from "@/lib/ai/read-certificate";
+import { matchColumns } from "@/lib/ai/import-columns";
 import { similarSkill } from "@/lib/ai/similar-skill";
 import { checkCertificateFile } from "@/lib/domain/certificate";
 import { existingSkill } from "@/lib/domain/certificate-facts";
@@ -110,6 +111,22 @@ async function evalSimilarSkills(): Promise<[number, number]> {
   return [correct, cases.length];
 }
 
+// Column titles of an import file: which title holds which field.
+async function evalImportColumns(): Promise<[number, number]> {
+  const cases: { headers: string[]; columns: Record<string, string | null> }[] = JSON.parse(readFileSync("tests/ai-eval/import-columns.json", "utf8"));
+  let correct = 0;
+  for (const expected of cases) {
+    let passed = 0;
+    for (let run = 0; run < RUNS; run++) {
+      const answer: Record<string, string | null> = await matchColumns(expected.headers);
+      if (Object.keys(expected.columns).every((field) => answer[field] === expected.columns[field])) passed++;
+    }
+    if (passed === RUNS) correct++;
+    console.log(`${passed === RUNS ? "ok  " : "FAIL"} ${passed}/${RUNS} ${expected.headers.join(", ")}`);
+  }
+  return [correct, cases.length];
+}
+
 async function main() {
   const [fields, allFields] = await evalCertificates();
   console.log(`${fields} of ${allFields} certificate fields correct\n`);
@@ -117,7 +134,9 @@ async function main() {
   console.log(`${questions} of ${allQuestions} questions correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
   const [names, allNames] = await evalSimilarSkills();
   console.log(`\n${names} of ${allNames} skill names correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
-  if (fields < allFields || questions < allQuestions || names < allNames) process.exit(1);
+  const [sheets, allSheets] = await evalImportColumns();
+  console.log(`\n${sheets} of ${allSheets} import files correct in all ${RUNS} ${RUNS === 1 ? "run" : "runs"}`);
+  if (fields < allFields || questions < allQuestions || names < allNames || sheets < allSheets) process.exit(1);
 }
 
 main().catch((error) => {

@@ -30,7 +30,7 @@ export function matrixTable(
 // Skill names are typed by users, so such a value gets a leading apostrophe and stays text.
 // An Excel file stores text cells as text and does not need this.
 export function safeCell(value: string): string {
-  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
 }
 
 export function toCsv(rows: string[][], separator = ","): string {

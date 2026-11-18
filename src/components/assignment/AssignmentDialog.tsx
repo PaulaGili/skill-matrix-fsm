@@ -8,11 +8,13 @@ import { checkFacts, type Suggestion } from "@/lib/domain/certificate-facts";
 import { formatDate, todayIso } from "@/lib/domain/status";
 import { fileToBase64 } from "@/lib/fsm/client";
 import { toUserMessage } from "@/lib/fsm/errors";
+import type { Snapshot } from "@/lib/domain/history";
 import type { Assignment, Certificate, Person, Skill } from "@/lib/fsm/services/model";
 import { removeAssignments } from "@/lib/fsm/services/remove";
 import { saveAssignment } from "@/lib/fsm/services/save-assignment";
+import { recordChange } from "@/lib/history/store";
 import { useI18n } from "@/lib/i18n/I18nProvider";
-import { AssignmentFields, fieldsError, toInput } from "./AssignmentFields";
+import { AssignmentFields, fieldsError, toInput, type FieldValues } from "./AssignmentFields";
 import { CertificateSection } from "./CertificateSection";
 import styles from "./AssignmentDialog.module.css";
 
@@ -27,7 +29,12 @@ interface Props {
 }
 
 export function AssignmentDialog({ person, skill, assignment, certificates, onClose, onSaved, onChanged }: Props) {
-  const [fields, setFields] = useState({ levelId: assignment?.levelId ?? null, startDate: assignment?.startDate ?? "", endDate: assignment?.endDate ?? "" });
+  const [fields, setFields] = useState<FieldValues>({
+    levelId: assignment?.levelId ?? null,
+    levelName: assignment?.levelName ?? null,
+    startDate: assignment?.startDate ?? "",
+    endDate: assignment?.endDate ?? "",
+  });
   // What this dialog last read or wrote. A later save is checked against it, not against a
   // reload that happened while the dialog was open.
   const [saved, setSaved] = useState(assignment);
@@ -44,6 +51,22 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
 
   const dateError = fieldsError(fields);
 
+  function record(kind: "assigned" | "edited" | "removed", before: Assignment | undefined, after: Assignment | undefined) {
+    const snapshot = (a: Assignment | undefined): Snapshot | null =>
+      a ? { levelId: a.levelId, levelName: a.levelName, startDate: a.startDate, endDate: a.endDate } : null;
+    recordChange({
+      kind,
+      skillId: skill.id,
+      skillName: skill.name,
+      personId: person.id,
+      personName: person.displayName,
+      assignmentId: (after ?? before)!.id,
+      before: snapshot(before),
+      after: snapshot(after),
+      lostCertificates: kind === "removed" ? certificates.length : 0,
+    });
+  }
+
   async function save() {
     if (dateError) return;
     setBusy(true);
@@ -55,10 +78,14 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
         deleteCertificateIds: removedIds,
         uploads,
       });
+      // The history gets the assignment when it is new or when its level or dates changed.
+      const after = { ...nowSaved, levelName: nowSaved.levelId ? (fields.levelName ?? nowSaved.levelName) : null };
+      const changed = saved && (saved.levelId !== after.levelId || saved.startDate !== after.startDate || saved.endDate !== after.endDate);
+      if (!saved || changed) record(saved ? "edited" : "assigned", saved, after);
       if (failures.length === 0) return onSaved(t(saved ? "assignment.saved" : "assignment.assigned"));
 
       // The assignment is saved, but some files were not uploaded. Keep those in the list.
-      setSaved(nowSaved);
+      setSaved(after);
       setMessages(failures.map((failure) => `${failure.fileName}: ${toUserMessage(failure.error, t)}`));
       setRemovedIds([]);
       setNewFiles(newFiles.filter((_, index) => failures.some((failure) => failure.index === index)));
@@ -76,7 +103,9 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
     setMessages([]);
     setSuggestion(null);
     try {
-      setSuggestion({ fileName: file.name, ...checkFacts(await readCertificateFacts(file), person.displayName, todayIso()) });
+      // The certificate is checked against the skill and, for an existing assignment, its dates.
+      const context = { skillName: skill.name, stored: saved && { startDate: saved.startDate, endDate: saved.endDate } };
+      setSuggestion({ fileName: file.name, ...checkFacts(await readCertificateFacts(file, skill.name), person.displayName, todayIso(), context) });
     } catch (error) {
       setMessages([toUserMessage(error, t)]);
     }
@@ -99,6 +128,7 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
     setBusy(true);
     try {
       await removeAssignments(skill.id, [saved!.id]);
+      record("removed", saved, undefined);
       onSaved(t("assignment.removed"));
     } catch (error) {
       setMessages([toUserMessage(error, t)]);

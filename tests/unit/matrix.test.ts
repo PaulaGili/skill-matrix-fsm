@@ -9,6 +9,8 @@ import {
   indexAssignments,
   personPasses,
   skillsWithMatches,
+  sortRank,
+  summarize,
   type CellFilter,
 } from "@/lib/domain/matrix";
 
@@ -159,5 +161,29 @@ describe("cellPasses and personPasses", () => {
     expect(ids(["valid", "expiring"])).toEqual(["s1"]);
     expect(ids([], ["Expert"])).toEqual(["s1"]);
     expect(ids(["notYetValid"])).toEqual([]);
+  });
+});
+
+describe("summarize and sortRank", () => {
+  const cells = buildCells(
+    [
+      { id: "a1", personId: "p1", skillId: "s1", startDate: "2026-01-01", endDate: null, levelName: "Expert" },
+      { id: "a2", personId: "p1", skillId: "s2", startDate: "2025-01-01", endDate: "2026-11-01", levelName: "Basic" },
+      { id: "a3", personId: "p2", skillId: "s1", startDate: "2026-01-01", endDate: "2026-11-20", levelName: "Basic" },
+    ],
+    new Set(["a1"]),
+    TODAY,
+  );
+
+  it("counts what needs attention among the given persons", () => {
+    expect(summarize(["p1", "p2"], cells)).toEqual({ expired: 1, expiring: 1, noCertificate: 2 });
+    expect(summarize(["p2"], cells)).toEqual({ expired: 0, expiring: 1, noCertificate: 1 });
+  });
+
+  it("ranks problems first and unassigned last", () => {
+    const rank = (personId: string, skillId: string) => sortRank(cells.get(cellKey(personId, skillId)));
+    expect(rank("p1", "s2")).toBeLessThan(rank("p2", "s1"));
+    expect(rank("p2", "s1")).toBeLessThan(rank("p1", "s1"));
+    expect(rank("p1", "s1")).toBeLessThan(rank("p3", "s1"));
   });
 });

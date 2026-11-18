@@ -39,15 +39,20 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
         <Title level="H5">{t("nav.matrix")}</Title>
         <Text>{t("help.matrixCells")}</Text>
         <Text>{t("help.matrixFilters")}</Text>
+        <Text>{t("help.sorting")}</Text>
         <Text>{t("help.systemUsers")}</Text>
         <Text>{t("help.ask")}</Text>
         <Text>{t("help.assignSeveral")}</Text>
+        <Text>{t("help.import")}</Text>
 
         <Title level="H5">{t("nav.catalog")}</Title>
         <Text>{t("help.catalogText")}</Text>
 
         <Title level="H5">{t("nav.expiry")}</Title>
         <Text>{t("help.expiryText")}</Text>
+
+        <Title level="H5">{t("nav.history")}</Title>
+        <Text>{t("help.historyText")}</Text>
 
         <Title level="H5">{t("shell.language")}</Title>
         <Text>{t("help.languageText")}</Text>

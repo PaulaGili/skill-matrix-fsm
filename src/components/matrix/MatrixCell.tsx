@@ -26,7 +26,6 @@ export function MatrixCell({ cell, filteredOut, label, onSelect }: Props) {
         aria-label={t("cell.unassignedLabel", { label })}
         onClick={onSelect}
       >
-        <span className={styles.unassigned}>-</span>
         <span className={styles.assign}>{t("action.assign")}</span>
       </button>
     );

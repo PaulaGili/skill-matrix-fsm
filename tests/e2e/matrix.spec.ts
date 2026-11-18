@@ -161,3 +161,44 @@ test("the language switch shows the app in German and remembers the choice", asy
   await page.reload();
   await expect(page.getByText("Personen (3)")).toBeVisible();
 });
+
+test("a new assignment appears in the history of changes and can be undone", async ({ page }) => {
+  await mockFsm(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Baumann, Beat, First Aid: not assigned. Assign" }).click();
+  await page.getByRole("button", { name: "Assign", exact: true }).click();
+  await expect(page.getByText("Skill assigned.")).toBeVisible();
+
+  await page.goto("/history");
+  await expect(page.getByText("Recent changes (1)")).toBeVisible();
+  await expect(page.getByText("Assigned", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo: Baumann, Beat, First Aid" })).toBeVisible();
+});
+
+test("an import file is checked row by row before anything is saved", async ({ page }) => {
+  const calls = await mockFsm(page);
+  let titles: unknown;
+  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai/import-columns", (route) => {
+    titles = route.request().postDataJSON();
+    return route.fulfill({ json: { person: "Wer", skill: "Was", level: null, validFrom: null, validTo: "Ablauf" } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+
+  const csv = ["Wer;Was;Ablauf", "Carla Conti;Welding;31.12.2030", "Anna Aerni;Welding;", "Nobody;Welding;", "Beat Baumann;First Aid;soon"].join("\n");
+  await page.locator("ui5-file-uploader input[type=file]").setInputFiles({ name: "skills.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+
+  // Unusual titles go to the AI, the rows do not.
+  await expect(page.getByText("The columns were matched by AI from their titles only.")).toBeVisible();
+  expect(titles).toEqual({ headers: ["Wer", "Was", "Ablauf"] });
+  await expect(page.getByText("The person already has this skill.")).toBeVisible();
+  await expect(page.getByText("No technician with this name.")).toBeVisible();
+  await expect(page.getByText("A date could not be read. Use 31.12.2027.")).toBeVisible();
+
+  const before = calls.length;
+  await page.getByRole("button", { name: "Import 1 assignment" }).click();
+  await expect(page.getByText("1 assignment imported.")).toBeVisible();
+  const create = calls.slice(before).find((call) => call.path === "skill/v2/skills");
+  expect(create?.body).toMatchObject([{ tagId: "T1", technician: "P3", endDate: "2030-12-31" }]);
+});

@@ -4,6 +4,7 @@ import { deleteCertificates } from "@/lib/fsm/services/certificates";
 import { OwnershipError } from "@/lib/fsm/services/ownership";
 import { removeAssignments } from "@/lib/fsm/services/remove";
 import { requireOwnSkill } from "@/lib/fsm/services/skills";
+import { undoChange } from "@/lib/history/undo";
 
 // A small FSM with our data (namespace "tester") and another candidate's. The tests check
 // which requests the services send, so that nothing foreign is ever written.
@@ -11,7 +12,15 @@ const TAGS = [
   { id: "T1", name: "tester::Welding", scaleId: "S1" },
   { id: "T9", name: "other::Welding", scaleId: "S9" },
 ];
-const skill = (id: string, tagId: string, tagName: string) => ({ id, tagId, tagName, technicianId: "P1", startDate: "2026-01-01", endDate: "9999-12-31" });
+const skill = (id: string, tagId: string, tagName: string) => ({
+  id,
+  tagId,
+  tagName,
+  technicianId: "P1",
+  startDate: "2026-01-01",
+  endDate: "9999-12-31",
+  proficiencyId: null,
+});
 const SKILLS = [skill("A1", "T1", "tester::Welding"), skill("A9", "T9", "other::Welding")];
 const ATTACHMENTS = [{ a: { id: "C1", fileName: "a.pdf", type: "PDF", "object.objectId": "A1" } }];
 
@@ -60,6 +69,34 @@ describe("removeAssignments", () => {
 
   it("deletes nothing when the assignment is not ours", async () => {
     await expect(removeAssignments("T1", ["A9"])).rejects.toThrow(OwnershipError);
+    expect(writes).toEqual([]);
+  });
+});
+
+describe("undoChange for a new assignment", () => {
+  const assigned = (assignmentId: string, startDate: string) => ({
+    id: "c1",
+    at: "2026-11-17T10:00:00Z",
+    kind: "assigned" as const,
+    skillId: "T1",
+    skillName: "Welding",
+    personId: "P1",
+    personName: "Aerni, Anna",
+    assignmentId,
+    before: null,
+    after: { levelId: null, levelName: null, startDate, endDate: null },
+    lostCertificates: 0,
+    undone: false,
+  });
+
+  it("keeps an assignment that has a certificate by now", async () => {
+    await expect(undoChange(assigned("A1", "2026-01-01"))).rejects.toThrow("has a certificate");
+    expect(writes).toEqual([]);
+  });
+
+  it("keeps an assignment that was changed or removed after it was created", async () => {
+    await expect(undoChange(assigned("A1", "2025-06-01"))).rejects.toThrow("changed");
+    await expect(undoChange(assigned("A-gone", "2026-01-01"))).rejects.toThrow("changed");
     expect(writes).toEqual([]);
   });
 });

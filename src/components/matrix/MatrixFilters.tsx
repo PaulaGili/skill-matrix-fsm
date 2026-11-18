@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Icon, Input, Label, MultiComboBox, MultiComboBoxItem, Switch } from "@ui5/webcomponents-react";
+import { Button, Icon, Input, Label, MultiComboBox, MultiComboBoxItem, ToggleButton } from "@ui5/webcomponents-react";
 import { CELL_FILTERS, type CellFilter } from "@/lib/domain/matrix";
 import type { Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
@@ -19,17 +19,14 @@ interface Props {
   skillIds: string[];
   levels: string[];
   statusFilters: CellFilter[];
-  showSystemUsers: boolean;
   onSearch: (search: string) => void;
   onSkillIds: (ids: string[]) => void;
   onLevels: (levels: string[]) => void;
   onStatusFilters: (filters: CellFilter[]) => void;
-  onShowSystemUsers: (shown: boolean) => void;
 }
 
 export function MatrixFilters(props: Props) {
-  const { skills, levelNames, search, skillIds, levels, statusFilters, showSystemUsers } = props;
-  const { onSearch, onSkillIds, onLevels, onStatusFilters, onShowSystemUsers } = props;
+  const { skills, levelNames, search, skillIds, levels, statusFilters, onSearch, onSkillIds, onLevels, onStatusFilters } = props;
   const { t } = useI18n();
   return (
     <>
@@ -66,43 +63,29 @@ export function MatrixFilters(props: Props) {
             ))}
           </MultiComboBox>
         )}
-        <span className={styles.inline}>
-          <Switch
-            id="system-users"
-            tooltip={t("filter.systemUsersHelp")}
-            accessibleNameRef="system-users-label"
-            checked={showSystemUsers}
-            onChange={(event) => onShowSystemUsers(event.target.checked)}
-          />
-          <Label id="system-users-label" for="system-users" onClick={() => onShowSystemUsers(!showSystemUsers)}>
-            {t("filter.showSystemUsers")}
-          </Label>
-        </span>
-      </div>
-
-      <div className={styles.inline} role="group" aria-label={t("filter.showOnlyGroup")}>
-        <Label>{t("filter.showOnly")}</Label>
-        {CELL_FILTERS.map((filter) => {
-          const active = statusFilters.includes(filter);
-          const label = filterLabel(filter, t);
-          return (
-            <Button
-              key={filter}
-              tooltip={t(`filterHelp.${filter}`)}
-              design={active ? "Emphasized" : "Default"}
-              icon={active ? "accept" : undefined}
-              accessibleName={t(active ? "filter.on" : "filter.off", { label })}
-              onClick={() => onStatusFilters(active ? statusFilters.filter((other) => other !== filter) : [...statusFilters, filter])}
-            >
-              {label}
+        <span className={styles.inline} role="group" aria-label={t("filter.showOnlyGroup")}>
+          <Label>{t("filter.showOnly")}</Label>
+          {CELL_FILTERS.map((filter) => {
+            const active = statusFilters.includes(filter);
+            const label = filterLabel(filter, t);
+            return (
+              <ToggleButton
+                key={filter}
+                tooltip={t(`filterHelp.${filter}`)}
+                pressed={active}
+                accessibleName={t(active ? "filter.on" : "filter.off", { label })}
+                onClick={() => onStatusFilters(active ? statusFilters.filter((other) => other !== filter) : [...statusFilters, filter])}
+              >
+                {label}
+              </ToggleButton>
+            );
+          })}
+          {statusFilters.length > 0 && (
+            <Button design="Transparent" icon="clear-filter" onClick={() => onStatusFilters([])}>
+              {t("filter.clear")}
             </Button>
-          );
-        })}
-        {statusFilters.length > 0 && (
-          <Button design="Transparent" icon="clear-filter" onClick={() => onStatusFilters([])}>
-            {t("filter.clear")}
-          </Button>
-        )}
+          )}
+        </span>
       </div>
     </>
   );

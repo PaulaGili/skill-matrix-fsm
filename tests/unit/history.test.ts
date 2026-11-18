@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CHANGES, canUndo, changedFields, markUndone, withChange, type Change, type Snapshot } from "@/lib/domain/history";
+import { MAX_CHANGES, canUndo, changedFields, markUndone, withChange, withNewAssignment, type Change, type Snapshot } from "@/lib/domain/history";
 
 const snapshot = (changes: Partial<Snapshot> = {}): Snapshot => ({ levelId: "L1", levelName: "Basic", startDate: "2026-01-01", endDate: null, ...changes });
 const change = (id: string, changes: Partial<Change> = {}): Change => ({
@@ -47,5 +47,11 @@ describe("history", () => {
     const changes = markUndone([change("newer"), change("older")], "newer");
     expect(canUndo(changes[0], changes)).toBe(false);
     expect(canUndo(changes[1], changes)).toBe(true);
+  });
+
+  it("points the entries of a person and skill to the assignment that an undo created", () => {
+    const removed = change("removed", { kind: "removed", after: null });
+    const changes = withNewAssignment([removed, change("edit"), change("other", { personId: "p2" })], removed, "a2");
+    expect(changes.map((c) => c.assignmentId)).toEqual(["a2", "a2", "a1"]);
   });
 });

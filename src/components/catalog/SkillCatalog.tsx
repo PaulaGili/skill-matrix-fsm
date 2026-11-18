@@ -40,7 +40,7 @@ export function SkillCatalog() {
   const assignmentsOf = (skill: Skill) => assignments.filter((assignment) => assignment.skillId === skill.id);
 
   return (
-    <div className={shell.panel}>
+    <div className={`${shell.panel} ${shell.narrow}`}>
       <Bar
         design="Header"
         startContent={<Title level="H3">{t("catalog.title", { count: skills.length })}</Title>}

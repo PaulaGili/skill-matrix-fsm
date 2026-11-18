@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Bar, Button, Dialog, Input, Label, MessageStrip, TextArea } from "@ui5/webcomponents-react";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { findSimilarSkill, isAiEnabled } from "@/lib/ai/client";
 import { toUserMessage } from "@/lib/fsm/errors";
 import type { Skill } from "@/lib/fsm/services/model";
 import { ensureLevelScale } from "@/lib/fsm/services/scale";
@@ -22,6 +24,11 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
   const [nameError, setNameError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // With AI configured, a new name is checked once against the catalogue for a skill that
+  // means the same. The user then decides.
+  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const [similar, setSimilar] = useState<string | null>(null);
+  const [checkedName, setCheckedName] = useState("");
   const { t } = useI18n();
 
   function validate(): string | null {
@@ -38,6 +45,16 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
 
     setSaving(true);
     setSaveError(null);
+    if (!skill && aiEnabled && checkedName !== name.trim()) {
+      setCheckedName(name.trim());
+      // If the check itself fails, the skill can still be created.
+      const found = await findSimilarSkill(
+        name.trim(),
+        existingSkills.map((other) => other.name),
+      ).catch(() => null);
+      setSimilar(found);
+      if (found) return setSaving(false);
+    }
     try {
       if (skill) {
         await updateSkill(skill.id, { name, description });
@@ -64,7 +81,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
           endContent={
             <>
               <Button design="Emphasized" onClick={save} disabled={saving}>
-                {t(skill ? "action.save" : "action.create")}
+                {t(skill ? "action.save" : similar ? "skill.createAnyway" : "action.create")}
               </Button>
               <Button design="Transparent" onClick={onClose} disabled={saving}>
                 {t("action.cancel")}
@@ -80,6 +97,11 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
             {saveError}
           </MessageStrip>
         )}
+        {similar && (
+          <MessageStrip design="Critical" hideCloseButton>
+            {t("skill.similar", { name: similar })}
+          </MessageStrip>
+        )}
         <Label for="skill-name" required>
           {t("field.name")}
         </Label>
@@ -93,6 +115,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
           onInput={(event) => {
             setName(event.target.value);
             setNameError(null);
+            setSimilar(null);
           }}
           onKeyDown={(event) => event.key === "Enter" && save()}
         />
