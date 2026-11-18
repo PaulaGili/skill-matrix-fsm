@@ -8,6 +8,8 @@ export function toUserMessage(error: unknown, t: Translate): string {
   if (error instanceof UserError) return t(error.key, error.params);
   if (error instanceof FsmError) {
     if (error.status === 409) return t("error.conflict");
+    // A hosting platform can cut a request before it reaches the app. Vercel does at 4.5 MB.
+    if (error.status === 413) return t("error.tooLargeForServer");
     if (DEMO_MODE && error.status === 403) return t("error.demoReadOnly");
     return t("error.fsm", { status: error.status, message: error.message });
   }

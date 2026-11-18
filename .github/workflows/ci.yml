@@ -5,9 +5,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Not a secret. The namespace is needed at build time.
       NEXT_PUBLIC_CANDIDATE_ID: paulagili
@@ -18,11 +22,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm test
-      - run: npm run build
-      - run: node scripts/ci/check-bundle.mjs
       - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+      # The same command as on a developer machine, so the two cannot drift apart.
+      - run: npm run gate

@@ -1,5 +1,6 @@
 // npm run cleanup: lists everything in our namespace. With "-- --yes" it deletes it:
-// certificates, assignments, skills, then the scale. FSM refuses any other order.
+// certificates, assignments, skills, then the scale. FSM refuses to delete a skill that is
+// still assigned, and it would keep the certificates of a deleted assignment.
 import { listAssignments } from "@/lib/fsm/services/assignments";
 import { listCertificates } from "@/lib/fsm/services/certificates";
 import { removeAssignments } from "@/lib/fsm/services/remove";

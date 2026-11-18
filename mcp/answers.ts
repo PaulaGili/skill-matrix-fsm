@@ -4,13 +4,14 @@ import { daysUntil } from "@/lib/domain/expiry";
 import { HELD_TODAY, buildCells, filterPersons } from "@/lib/domain/matrix";
 import type { MatrixData } from "@/lib/fsm/services/matrix";
 
-function rows(data: MatrixData, today: string) {
+// `ofPerson` keeps the rows of some persons, by id: two technicians can share a name.
+function rows(data: MatrixData, today: string, ofPerson: (personId: string) => boolean = () => true) {
   const withCertificate = new Set(data.certificates.map((certificate) => certificate.assignmentId));
   const technicians = data.persons.filter((person) => person.isTechnician);
   return [...buildCells(data.assignments, withCertificate, today).values()].flatMap((cell) => {
     const person = technicians.find((p) => p.id === cell.assignment.personId);
     const skill = data.skills.find((s) => s.id === cell.assignment.skillId);
-    if (!person || !skill) return [];
+    if (!person || !skill || !ofPerson(person.id)) return [];
     return [
       {
         person: person.displayName,
@@ -30,7 +31,7 @@ export function listSkills(data: MatrixData, today: string) {
   return data.skills.map((skill) => ({
     skill: skill.name,
     description: skill.description,
-    heldToday: all.filter((row) => row.skill === skill.name && HELD_TODAY.includes(row.status as (typeof HELD_TODAY)[number])).length,
+    heldToday: all.filter((row) => row.skill === skill.name && (HELD_TODAY as readonly string[]).includes(row.status)).length,
   }));
 }
 
@@ -42,9 +43,9 @@ export function whoHolds(data: MatrixData, today: string, skillName: string) {
 }
 
 export function skillsOfPerson(data: MatrixData, today: string, name: string) {
-  const persons = filterPersons(data.persons, name, false).map((person) => person.displayName);
-  if (persons.length === 0) return { error: `No technician matches "${name}".` };
-  return rows(data, today).filter((row) => persons.includes(row.person));
+  const ids = filterPersons(data.persons, name, false).map((person) => person.id);
+  if (ids.length === 0) return { error: `No technician matches "${name}".` };
+  return rows(data, today, (personId) => ids.includes(personId));
 }
 
 export function expiring(data: MatrixData, today: string, days: number) {

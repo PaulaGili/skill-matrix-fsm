@@ -4,23 +4,16 @@
 import { CANDIDATE_ID } from "@/lib/candidate";
 import { markUndone, withChange, withNewAssignment, type Change } from "@/lib/domain/history";
 import type { Assignment } from "@/lib/fsm/services/model";
+import { readStoredJson, store } from "@/lib/storage";
 
 const KEY = `history:${CANDIDATE_ID}`;
 
 export function loadChanges(): Change[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
-    return Array.isArray(stored) ? stored : [];
-  } catch {
-    return [];
-  }
+  const stored = readStoredJson(KEY);
+  return Array.isArray(stored) ? stored : [];
 }
 
-function save(changes: Change[]) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(changes));
-  } catch {}
-}
+const save = (changes: Change[]) => store(KEY, JSON.stringify(changes));
 
 // The history is a convenience. Recording must never fail a save that FSM has accepted.
 export function recordChange(change: Omit<Change, "id" | "at" | "undone">): void {

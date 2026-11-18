@@ -74,7 +74,7 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
               </Button>
             ) : (
               <Button design="Negative" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-                {t("remove.deleteEverything")}...
+                {t("remove.deleteEverythingAsk")}
               </Button>
             ))
           }

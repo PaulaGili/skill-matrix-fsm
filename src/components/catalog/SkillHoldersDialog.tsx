@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, Button, Dialog } from "@ui5/webcomponents-react";
+import { CloseDialog } from "@/components/common/CloseDialog";
 import { AssignmentsTable } from "@/components/common/AssignmentsTable";
 import { assignmentStatus, todayIso } from "@/lib/domain/status";
 import type { Assignment, Certificate, Person, Skill } from "@/lib/fsm/services/model";
@@ -30,12 +30,7 @@ export function SkillHoldersDialog({ skill, persons, assignments, certificates, 
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <Dialog
-      open
-      headerText={skill.description ? `${skill.name}, ${skill.description}` : skill.name}
-      onClose={onClose}
-      footer={<Bar design="Footer" endContent={<Button onClick={onClose}>{t("action.close")}</Button>} />}
-    >
+    <CloseDialog title={skill.description ? `${skill.name}, ${skill.description}` : skill.name} onClose={onClose}>
       <div className={styles.inDialog}>
         <AssignmentsTable
           exportName="skill-persons"
@@ -46,6 +41,6 @@ export function SkillHoldersDialog({ skill, persons, assignments, certificates, 
           certificates={certificates}
         />
       </div>
-    </Dialog>
+    </CloseDialog>
   );
 }

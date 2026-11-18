@@ -2,11 +2,12 @@
 // that carries the proficiency level.
 import { assertBulkOk, skillApi, skillSearch } from "@/lib/fsm/client";
 import { NAME_PREFIX, isOwnName } from "@/lib/candidate";
+import { MAX_IMPORT_ROWS } from "@/lib/domain/import";
 import { OPEN_END_DATE, todayIso, validateValidity } from "@/lib/domain/status";
 import { UserError } from "@/lib/i18n/translate";
 import type { SkillServiceSkill } from "@/lib/fsm/types";
 import { OwnershipError } from "./ownership";
-import { requireOwnSkill } from "./skills";
+import { listSkills, requireOwnSkill } from "./skills";
 import type { Assignment, Skill } from "./model";
 
 export interface AssignmentInput {
@@ -60,19 +61,30 @@ function validDates(input: AssignmentInput): { startDate: string; endDate: strin
   return { startDate, endDate };
 }
 
-export const MAX_BULK_ASSIGNMENTS = 20;
+// The import goes through createAssignments, so both share one limit.
+export const MAX_BULK_ASSIGNMENTS = MAX_IMPORT_ROWS;
 
-// One request for all persons, each with its own dates. The assessment rules allow a few
-// dozen records at most. A person who already has the skill is refused, so a retry or a
-// second browser tab cannot create a duplicate.
-export async function createAssignments(skillId: string, inputs: (AssignmentInput & { personId: string })[]): Promise<Assignment[]> {
+export type NewAssignment = AssignmentInput & { skillId: string; personId: string };
+
+// One request for all of them, whatever skills and persons they name, each with its own
+// dates. The assessment rules allow a few dozen records at most. A person who already has the
+// skill is refused, so a retry or a second browser tab cannot create a duplicate.
+export async function createAssignments(inputs: NewAssignment[]): Promise<Assignment[]> {
   if (inputs.length > MAX_BULK_ASSIGNMENTS) throw new UserError({ key: "error.tooManyPersons", params: { max: MAX_BULK_ASSIGNMENTS } });
   const dates = inputs.map(validDates);
-  const [skill, existing] = await Promise.all([requireOwnSkill(skillId), listAssignments()]);
-  const taken = inputs.filter((input) => existing.some((a) => a.skillId === skill.id && a.personId === input.personId));
-  if (taken.length > 0) throw new UserError({ key: "error.alreadyAssigned", params: { count: taken.length, skill: skill.name } });
+  const [skills, existing] = await Promise.all([listSkills(), listAssignments()]);
+  for (const input of inputs) {
+    if (!skills.some((skill) => skill.id === input.skillId)) throw new OwnershipError({ key: "error.skillGone", params: { id: input.skillId } });
+  }
+  const taken = inputs.filter((input) => existing.some((a) => a.skillId === input.skillId && a.personId === input.personId));
+  if (taken.length > 0) {
+    // An import can name several skills. The message names the first one and counts its rows.
+    const skill = skills.find((s) => s.id === taken[0].skillId)!;
+    const count = taken.filter((input) => input.skillId === skill.id).length;
+    throw new UserError({ key: "error.alreadyAssigned", params: { count, skill: skill.name } });
+  }
   const body = inputs.map((input, index) => ({
-    tagId: skill.id,
+    tagId: input.skillId,
     technician: input.personId,
     startDate: dates[index].startDate,
     ...(dates[index].endDate ? { endDate: dates[index].endDate } : {}),
@@ -80,25 +92,28 @@ export async function createAssignments(skillId: string, inputs: (AssignmentInpu
   }));
   const created = assertBulkOk<SkillServiceSkill>(await skillApi("v2/skills", { method: "POST", body })).map(toAssignment);
 
-  // FSM gives every new skill the first level of the scale, whatever is sent: no
-  // proficiencyId, null, and a scale without a default level were all tried. "No level"
-  // therefore needs one more call per skill that clears it. They run together.
-  // If such a call fails, the assignment keeps that level and is returned with it, so the
-  // matrix and the history show what FSM really holds.
-  await Promise.all(
-    created.map(async (assignment, index) => {
-      if (inputs[index].levelId || !assignment.levelId) return;
+  // FSM gives every new skill the first level of the scale, whatever is sent. "No level"
+  // therefore needs one more call per skill that clears it. They run together and are matched
+  // by skill and person, not by position in the answer. If such a call fails, the assignment
+  // keeps that level and is returned with it, so the matrix shows what FSM really holds.
+  const key = (skillId: string, personId: string) => `${skillId} ${personId}`;
+  const noLevel = new Map(inputs.flatMap((input, index) => (input.levelId ? [] : [[key(input.skillId, input.personId), dates[index]] as const])));
+  return Promise.all(
+    created.map(async (assignment) => {
+      const wanted = noLevel.get(key(assignment.skillId, assignment.personId));
+      if (!wanted || !assignment.levelId) return assignment;
       try {
-        await patchAssignment(skill.id, assignment.id, null, dates[index]);
-        created[index] = { ...assignment, levelId: null, levelName: null, level: null };
-      } catch {}
+        await patchAssignment(assignment.skillId, assignment.id, null, wanted);
+        return { ...assignment, levelId: null, levelName: null, level: null };
+      } catch {
+        return assignment;
+      }
     }),
   );
-  return created;
 }
 
 export async function createAssignment(skillId: string, personId: string, input: AssignmentInput): Promise<Assignment> {
-  const [created] = await createAssignments(skillId, [{ ...input, personId }]);
+  const [created] = await createAssignments([{ ...input, skillId, personId }]);
   return created;
 }
 
@@ -122,24 +137,20 @@ export async function updateAssignment(skillId: string, loaded: Assignment, inpu
   await patchAssignment(skill.id, loaded.id, input.levelId, { startDate, endDate });
 }
 
-// Ends each assignment on the date `endDateOf` gives for it. If FSM fails halfway, the user
-// is told how many were ended; trying again ends the rest.
+// Ends each assignment on the date `endDateOf` gives for it, all in one request. The bulk
+// route updates a skill that is sent with its id and keeps its level; checked against FSM.
 export async function endAssignments(skillId: string, assignmentIds: string[], endDateOf: (assignment: Assignment) => string): Promise<void> {
   if (assignmentIds.length === 0) return;
   const { skill, assignments } = await requireOwnAssignments(skillId, assignmentIds);
-  let ended = 0;
-  try {
-    for (const assignment of assignments) {
-      await skillApi(`v1/tags/${skill.id}/skills/${assignment.id}`, {
-        method: "PATCH",
-        body: { startDate: assignment.startDate, endDate: endDateOf(assignment), validityType: "LF" },
-      });
-      ended++;
-    }
-  } catch (error) {
-    if (ended === 0) throw error;
-    throw new UserError({ key: "error.endedSome", params: { done: ended, total: assignments.length } });
-  }
+  const body = assignments.map((assignment) => ({
+    id: assignment.id,
+    tagId: skill.id,
+    technician: assignment.personId,
+    startDate: assignment.startDate,
+    endDate: endDateOf(assignment),
+    validityType: "LF",
+  }));
+  assertBulkOk(await skillApi("v2/skills", { method: "POST", body }));
 }
 
 // Deletes the FSM Skills only. The app calls removeAssignments() in remove.ts, which

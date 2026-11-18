@@ -5,15 +5,24 @@ import type { QuestionAnswer } from "@/lib/domain/question";
 import { fileToBase64 } from "@/lib/fsm/client";
 import { UserError, type MessageKey } from "@/lib/i18n/translate";
 
-export async function isAiEnabled(): Promise<boolean> {
-  const response = await fetch("/api/ai/certificate");
-  return response.ok && (await response.json()).enabled === true;
+// Asked once and remembered: the answer cannot change while the page is open. A request that
+// failed is not remembered, so the next dialog asks again.
+let enabled: Promise<boolean> | undefined;
+export function isAiEnabled(): Promise<boolean> {
+  enabled ??= fetch("/api/ai")
+    .then(async (response) => (await response.json()).enabled === true)
+    .catch(() => {
+      enabled = undefined;
+      return false;
+    });
+  return enabled;
 }
 
-// The routes answer with an English text. The status is enough to show a translated one.
+// The status of the answer is enough to show a translated text.
 async function post<T>(path: string, body: unknown, fallback: MessageKey): Promise<T> {
   const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await response.json().catch(() => null);
+  if (response.status === 413) throw new UserError({ key: "error.tooLargeForServer" });
   if (response.status === 429) throw new UserError({ key: "ai.busy" });
   if (response.status === 502 || response.status === 503) throw new UserError({ key: "ai.unavailable" });
   if (!response.ok || !data) throw new UserError({ key: fallback });
@@ -31,12 +40,12 @@ export async function findSimilarSkill(name: string, existing: string[]): Promis
   return existingSkill(answer.similar, existing);
 }
 
-// Sends the question with the names of skills and levels. No person data leaves the browser.
+// Sends the question with the names of skills and levels. A name typed in the question goes with it.
 export function askMatrix(question: string, skills: string[], levels: string[]): Promise<QuestionAnswer> {
   return post("/api/ai/question", { question, skills, levels }, "ai.questionFailed");
 }
 
-// Asks which column of an import file holds which field. Only the column titles are sent.
+// Asks which column of an import file holds which field. Only the titles given here are sent.
 export async function matchImportColumns(headers: string[]): Promise<ColumnMap> {
   const answer = await post<Record<ImportField, string | null>>("/api/ai/import-columns", { headers }, "ai.columnsNotMatched");
   return columnsFromHeaders(answer, headers);

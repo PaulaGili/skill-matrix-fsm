@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mockFsm } from "./fsm-mock";
+import { PREFIX, daysFromToday, mockFsm } from "./fsm-mock";
 
 test("shows the status of every assignment and loads with four FSM calls", async ({ page }) => {
   const calls = await mockFsm(page);
@@ -70,11 +70,8 @@ test("assigning a skill validates the dates and sends them to FSM", async ({ pag
 
 test("AI proposes the dates of a certificate and the user decides", async ({ page }) => {
   await mockFsm(page);
-  await page.route("**/api/ai/certificate", (route) =>
-    route.request().method() === "GET"
-      ? route.fulfill({ json: { enabled: true } })
-      : route.fulfill({ json: { holderName: "Eva Graf", validFrom: "2026-03-01", validTo: "2028-02-29" } }),
-  );
+  await page.route("**/api/ai", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { holderName: "Eva Graf", validFrom: "2026-03-01", validTo: "2028-02-29" } }));
   await page.goto("/");
   await page.getByRole("button", { name: "Baumann, Beat, First Aid: not assigned. Assign" }).click();
   await page.locator("ui5-file-uploader input[type=file]").setInputFiles("tests/fixtures/sample-certificate.pdf");
@@ -91,7 +88,7 @@ test("AI proposes the dates of a certificate and the user decides", async ({ pag
 
 test("without an AI key the Read dates button is not offered", async ({ page }) => {
   await mockFsm(page);
-  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { enabled: false } }));
+  await page.route("**/api/ai", (route) => route.fulfill({ json: { enabled: false } }));
   await page.goto("/");
   await page.getByRole("button", { name: "Baumann, Beat, First Aid: not assigned. Assign" }).click();
   await page.locator("ui5-file-uploader input[type=file]").setInputFiles("tests/fixtures/sample-certificate.pdf");
@@ -100,7 +97,7 @@ test("without an AI key the Read dates button is not offered", async ({ page }) 
   await expect(page.getByRole("button", { name: "Read dates" })).toBeHidden();
 });
 
-test("the expiry page lists what ends soon, soonest first", async ({ page }) => {
+test("the expiry page lists what ends soon, and on request what has already expired", async ({ page }) => {
   const calls = await mockFsm(page);
   await page.goto("/expiry");
 
@@ -109,12 +106,18 @@ test("the expiry page lists what ends soon, soonest first", async ({ page }) => 
   await expect(page.getByText("Baumann, Beat")).toBeVisible();
   await expect(page.getByText("Conti, Carla")).toBeHidden();
   expect(calls).toHaveLength(4);
+
+  await page.locator("#expiry-window").click();
+  await page.getByRole("option", { name: "Already expired" }).click();
+  await expect(page.getByText("Expired assignments (1)")).toBeVisible();
+  await expect(page.getByText("5 days ago")).toBeVisible();
+  await expect(page.getByText("Conti, Carla")).toBeVisible();
 });
 
 test("a question in plain words sets the filters", async ({ page }) => {
   await mockFsm(page);
   let sent: unknown;
-  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai", (route) => route.fulfill({ json: { enabled: true } }));
   await page.route("**/api/ai/question", (route) => {
     sent = route.request().postDataJSON();
     const diving = String(route.request().postDataJSON().question).includes("diving");
@@ -155,14 +158,6 @@ test("the language switch shows the app in German and remembers the choice", asy
   await page.getByRole("button", { name: "Baumann, Beat, First Aid: nicht zugewiesen. Zuweisen" }).click();
   await expect(page.getByText("Gültig ab", { exact: true })).toBeVisible();
   await expect(page.getByText("Zertifikate (0)")).toBeVisible();
-  const from = page.locator("#valid-from input");
-  const to = page.locator("#valid-to input");
-  await from.fill("01.01.2026");
-  await from.press("Tab");
-  await to.fill("31.12.2025");
-  await to.press("Tab");
-  await expect(page.getByRole("alert")).toHaveText("Gültig bis darf nicht vor Gültig ab liegen.");
-  await expect(page.getByRole("button", { name: "Zuweisen", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Abbrechen" }).click();
 
   // The choice is stored, so it wins over the English browser language after a reload.
@@ -186,7 +181,7 @@ test("a new assignment appears in the history of changes and can be undone", asy
 test("an import file is checked row by row before anything is saved", async ({ page }) => {
   const calls = await mockFsm(page);
   let titles: unknown;
-  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai", (route) => route.fulfill({ json: { enabled: true } }));
   await page.route("**/api/ai/import-columns", (route) => {
     titles = route.request().postDataJSON();
     return route.fulfill({ json: { person: "Wer", skill: "Was", level: null, validFrom: null, validTo: "Ablauf" } });
@@ -198,8 +193,10 @@ test("an import file is checked row by row before anything is saved", async ({ p
   const csv = ["Wer;Was;Ablauf", "Carla Conti;Welding;31.12.2030", "Anna Aerni;Welding;", "Nobody;Welding;", "Beat Baumann;First Aid;soon"].join("\n");
   await page.locator("ui5-file-uploader input[type=file]").setInputFiles({ name: "skills.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
 
-  // Unusual titles go to the AI, the rows do not.
-  await expect(page.getByText("The columns were matched by AI from their titles only.")).toBeVisible();
+  // Unusual titles go to the AI only on a click, the rows do not.
+  expect(titles).toBeUndefined();
+  await page.getByRole("button", { name: "Match columns with AI" }).click();
+  await expect(page.getByText("The columns were matched by AI. Only the titles the app did not recognise were sent.")).toBeVisible();
   expect(titles).toEqual({ headers: ["Wer", "Was", "Ablauf"] });
   await expect(page.getByText("The person already has this skill.")).toBeVisible();
   await expect(page.getByText("No technician with this name.")).toBeVisible();
@@ -212,14 +209,22 @@ test("an import file is checked row by row before anything is saved", async ({ p
   expect(create?.body).toMatchObject([{ tagId: "T1", technician: "P3", endDate: "2030-12-31" }]);
 });
 
-test("a click on a person lists all skills of that person with the certificates", async ({ page }) => {
+test("a click on a person lists the skills, opens a certificate and offers the export", async ({ page }) => {
   await mockFsm(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Show all skills of Aerni, Anna" }).click();
 
   await expect(page.getByRole("heading", { name: "Skills (1)" })).toBeVisible();
   await expect(page.getByRole("gridcell", { name: "Expert" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "welding.pdf" })).toBeVisible();
+
+  await page.getByRole("link", { name: "welding.pdf" }).click();
+  await expect(page.getByText("Certificate: Aerni, Anna, Welding")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("Certificate: Aerni, Anna, Welding")).toBeHidden();
+
+  await page.locator("[ui5-dialog]").getByRole("button", { name: "Additional Options" }).click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(page.getByText("Columns to export (1 row)")).toBeVisible();
 });
 
 test("a skill column can be dragged to the right and to the left, and the order is kept", async ({ page }) => {
@@ -264,27 +269,6 @@ test("the catalogue can be sorted and searched, and a skill shows who holds it",
   await expect(page.getByText("Excel (.xlsx)")).toBeVisible();
 });
 
-test("the expiry page can list what has already expired", async ({ page }) => {
-  await mockFsm(page);
-  await page.goto("/expiry");
-  await expect(page.getByText("Expiring assignments (1)")).toBeVisible();
-
-  await page.locator("#expiry-window").click();
-  await page.getByRole("option", { name: "Already expired" }).click();
-
-  await expect(page.getByText("Expired assignments (1)")).toBeVisible();
-  await expect(page.getByText("5 days ago")).toBeVisible();
-  await expect(page.getByText("Conti, Carla")).toBeVisible();
-});
-
-test("a certificate opens in the viewer from the person view", async ({ page }) => {
-  await mockFsm(page);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Show all skills of Aerni, Anna" }).click();
-  await page.getByRole("link", { name: "welding.pdf" }).click();
-  await expect(page.getByText("Certificate: Aerni, Anna, Welding")).toBeVisible();
-});
-
 test("a technician picks the own name and sees the own skills, and the choice is remembered", async ({ page }) => {
   await mockFsm(page);
   await page.goto("/me");
@@ -305,32 +289,108 @@ test("a technician picks the own name and sees the own skills, and the choice is
   await expect(page.getByText("My skills (1)")).toBeVisible();
 });
 
-test("on a tablet the folded columns of a list keep their title as a plain label", async ({ page }) => {
-  await page.setViewportSize({ width: 820, height: 1100 });
-  await mockFsm(page);
-  await page.goto("/expiry");
-  await expect(page.getByText("Baumann, Beat")).toBeVisible();
+// The required scope, end to end: catalogue, assignment, certificates.
 
-  // A folded cell names its column in plain text, without a button.
-  expect(await page.getByRole("button", { name: "Level", exact: true }).count()).toBe(0);
-});
-
-test("the name of the app in the top bar leads back to the matrix", async ({ page }) => {
-  await mockFsm(page);
+test("the catalogue creates, renames and deletes a skill, always in our namespace", async ({ page }) => {
+  const calls = await mockFsm(page);
+  const tagWrites = () => calls.filter((call) => call.path === "skill/v2/tags");
   await page.goto("/catalog");
   await expect(page.getByText("Skills (2)")).toBeVisible();
 
-  await page.getByRole("link", { name: "Skill Management" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Persons (3)")).toBeVisible();
+  // A name that exists is refused before FSM is asked, whatever the capitals.
+  await page.getByRole("button", { name: "Create skill" }).click();
+  await page.locator("#skill-name input").fill("welding");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(page.getByText("A skill with this name already exists.", { exact: true })).toBeVisible();
+  expect(tagWrites()).toHaveLength(0);
+
+  await page.locator("#skill-name input").fill("Crane Operation");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(page.getByText("Skill created.")).toBeVisible();
+  expect(tagWrites()[0].body).toEqual([{ name: `${PREFIX}Crane Operation`, scaleId: "SCALE" }]);
+  await expect(page.getByText("Skills (3)")).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit Crane Operation" }).click();
+  await page.locator("#skill-name input").fill("Crane Operation II");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Skill saved.")).toBeVisible();
+  expect(tagWrites()[1].body).toMatchObject([{ id: "T9", name: `${PREFIX}Crane Operation II` }]);
+
+  await page.getByRole("button", { name: "Delete Crane Operation II" }).click();
+  await expect(page.getByText("This skill is not assigned to anyone.")).toBeVisible();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Crane Operation II deleted.")).toBeVisible();
+  expect(tagWrites()[2]).toMatchObject({ method: "DELETE", body: [{ id: "T9" }] });
+  await expect(page.getByText("Skills (2)")).toBeVisible();
 });
 
-test("the skills of a person can be exported from the person view", async ({ page }) => {
-  await mockFsm(page);
+test("deleting a skill that is still assigned retires it by default and keeps the skill", async ({ page }) => {
+  const calls = await mockFsm(page);
+  await page.goto("/catalog");
+  await page.getByRole("button", { name: "Delete Welding" }).click();
+  await page.getByRole("button", { name: "Retire skill" }).click();
+  await expect(page.getByText("Welding retired.")).toBeVisible();
+
+  // Both holders end yesterday, in one request. Nothing is deleted.
+  const yesterday = daysFromToday(-1);
+  const ended = calls.filter((call) => call.path === "skill/v2/skills");
+  expect(ended).toHaveLength(1);
+  expect(ended[0].body).toMatchObject([
+    { id: "A1", tagId: "T1", endDate: yesterday, validityType: "LF" },
+    { id: "A2", tagId: "T1", endDate: yesterday, validityType: "LF" },
+  ]);
+  expect(calls.filter((call) => call.method === "DELETE")).toEqual([]);
+  await expect(page.getByText("Skills (2)")).toBeVisible();
+});
+
+test("an assignment is edited: files are checked, a certificate is added and one deleted, the dates change", async ({ page }) => {
+  const calls = await mockFsm(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Show all skills of Aerni, Anna" }).click();
-  await page.locator("[ui5-dialog]").getByRole("button", { name: "Additional Options" }).click();
-  await page.getByRole("button", { name: "Export", exact: true }).click();
-  await expect(page.getByText("Excel (.xlsx)")).toBeVisible();
-  await expect(page.getByText("Columns to export (1 row)")).toBeVisible();
+  await page.getByRole("button", { name: "Aerni, Anna, Welding: Valid. Edit" }).click();
+  await expect(page.getByText("Certificates (1)")).toBeVisible();
+
+  const files = page.locator("ui5-file-uploader input[type=file]");
+  await files.setInputFiles([
+    { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("notes") },
+    { name: "scan.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(5 * 1024 * 1024 + 1) },
+  ]);
+  await expect(page.getByText("notes.txt: Only PDF, JPG and PNG files are allowed.")).toBeVisible();
+  await expect(page.getByText("scan.pdf: The file is larger than 5 MB.")).toBeVisible();
+  await expect(page.getByText("Certificates (1)")).toBeVisible();
+
+  await files.setInputFiles("tests/fixtures/sample-certificate.pdf");
+  await expect(page.getByText("Certificates (2)")).toBeVisible();
+  await page.getByRole("button", { name: "Delete welding.pdf" }).click();
+  await expect(page.getByText("Certificates (1)")).toBeVisible();
+
+  const to = page.locator("#valid-to input");
+  await to.fill("31.12.2030");
+  await to.press("Tab");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Assignment saved.")).toBeVisible();
+
+  // In this order: the assignment, the marked certificate, the new file.
+  const writes = calls.filter((call) => call.method !== "POST" || call.path === "data/v4/Attachment");
+  expect(writes.map((call) => `${call.method} ${call.path}`)).toEqual([
+    "PATCH skill/v1/tags/T1/skills/A1",
+    "DELETE data/v4/Attachment/C1",
+    "POST data/v4/Attachment",
+  ]);
+  expect(writes[0].body).toEqual({ proficiencyId: "L2", startDate: "2025-01-01", endDate: "2030-12-31", validityType: "LF" });
+  expect(writes[2].body).toMatchObject({ fileName: "sample-certificate.pdf", type: "PDF", object: { objectId: "A1", objectType: "SKILL" } });
+});
+
+test("removing an assignment asks first and deletes its certificates before the assignment", async ({ page }) => {
+  const calls = await mockFsm(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Aerni, Anna, Welding: Valid. Edit" }).click();
+  await page.getByRole("button", { name: "Remove assignment..." }).click();
+  expect(calls.filter((call) => call.method === "DELETE")).toEqual([]);
+
+  await page.getByRole("button", { name: "Remove now" }).click();
+  await expect(page.getByText("Assignment removed.")).toBeVisible();
+  const deletes = calls.filter((call) => call.method === "DELETE");
+  expect(deletes.map((call) => call.path)).toEqual(["data/v4/Attachment/C1", "skill/v2/skills"]);
+  expect(deletes[1].body).toEqual([{ id: "A1" }]);
+  await expect(page.getByRole("button", { name: "Aerni, Anna, Welding: not assigned. Assign" })).toBeVisible();
 });

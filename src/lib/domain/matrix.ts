@@ -13,8 +13,6 @@ export interface Cell<A> {
   hasCertificate: boolean;
 }
 
-export type CellFilter = "expired" | "expiring" | "notYetValid" | "valid" | "noCertificate";
-
 // The cell filters of the matrix. An empty list means "any".
 export interface MatrixFilters {
   statuses: CellFilter[];
@@ -30,6 +28,12 @@ export function filterPersons<P extends { displayName: string; isTechnician: boo
     const name = person.displayName.toLowerCase();
     return (showSystemUsers || person.isTechnician) && words.every((word) => name.includes(word));
   });
+}
+
+// The level names that are in use, lowest level first.
+export function levelNamesOf(assignments: { levelName: string | null; level: number | null }[]): string[] {
+  const byName = new Map(assignments.filter((a) => a.levelName).map((a) => [a.levelName!, a.level ?? 0]));
+  return [...byName.keys()].sort((a, b) => byName.get(a)! - byName.get(b)!);
 }
 
 // No selection means all skills.
@@ -75,7 +79,8 @@ export function buildCells<A extends AssignmentLike>(assignments: A[], assignmen
 }
 
 // In the order the statuses are listed in the assignment.
-export const CELL_FILTERS: CellFilter[] = ["valid", "expiring", "expired", "notYetValid", "noCertificate"];
+export const CELL_FILTERS = ["valid", "expiring", "expired", "notYetValid", "noCertificate"] as const;
+export type CellFilter = (typeof CELL_FILTERS)[number];
 
 // A skill someone can be sent out with today. The matrix switches these two on when a
 // skill is selected, so the default is visible and can be changed.

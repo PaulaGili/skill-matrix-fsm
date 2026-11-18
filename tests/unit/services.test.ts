@@ -96,15 +96,15 @@ describe("toCertificates", () => {
 });
 
 describe("createAssignments", () => {
-  const input = { personId: "P1", levelId: null, startDate: null, endDate: null };
+  const input = { skillId: "T1", personId: "P1", levelId: null, startDate: null, endDate: null };
 
   it("refuses more persons than the limit before anything is sent", async () => {
     const tooMany = Array.from({ length: MAX_BULK_ASSIGNMENTS + 1 }, (_, index) => ({ ...input, personId: `P${index}` }));
-    await expect(createAssignments("T1", tooMany)).rejects.toThrow("At most 20 persons");
+    await expect(createAssignments(tooMany)).rejects.toThrow("At most 20 persons");
   });
 
   it("refuses dates in the wrong order for any person before anything is sent", async () => {
     const wrong = { ...input, personId: "P2", startDate: "2026-02-01", endDate: "2026-01-01" };
-    await expect(createAssignments("T1", [input, wrong])).rejects.toThrow("Valid to must not be before");
+    await expect(createAssignments([input, wrong])).rejects.toThrow("Valid to must not be before");
   });
 });

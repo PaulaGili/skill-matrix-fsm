@@ -1,9 +1,11 @@
 "use client";
 
-import { Bar, Button, Dialog, Icon, Text, Title } from "@ui5/webcomponents-react";
+import { Icon, Text, Title } from "@ui5/webcomponents-react";
 import { CANDIDATE_ID } from "@/lib/candidate";
+import { MAX_IMPORT_ROWS } from "@/lib/domain/import";
 import type { AssignmentStatus } from "@/lib/domain/status";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { CloseDialog } from "./CloseDialog";
 import { StatusBadge } from "./StatusBadge";
 import styles from "./HelpDialog.module.css";
 
@@ -12,12 +14,7 @@ const STATUSES: AssignmentStatus[] = ["valid", "expiring", "expired", "notYetVal
 export function HelpDialog({ company, onClose }: { company?: string; onClose: () => void }) {
   const { t } = useI18n();
   return (
-    <Dialog
-      open
-      headerText={t("shell.help")}
-      onClose={onClose}
-      footer={<Bar design="Footer" endContent={<Button onClick={onClose}>{t("action.close")}</Button>} />}
-    >
+    <CloseDialog title={t("shell.help")} onClose={onClose}>
       <div className={styles.help}>
         <Title level="H5">{t("help.statuses")}</Title>
         <dl className={styles.statuses}>
@@ -42,8 +39,8 @@ export function HelpDialog({ company, onClose }: { company?: string; onClose: ()
         <Text>{t("help.person")}</Text>
         <Text>{t("help.matrixFilters")}</Text>
         <Text>{t("help.sorting")}</Text>
-        <Text>{t("help.assignSeveral")}</Text>
-        <Text>{t("help.import")}</Text>
+        <Text>{t("help.assignSeveral", { max: MAX_IMPORT_ROWS })}</Text>
+        <Text>{t("help.import", { max: MAX_IMPORT_ROWS })}</Text>
         <Text>{t("help.ask")}</Text>
 
         <Title level="H5">{t("nav.catalog")}</Title>
@@ -66,6 +63,6 @@ export function HelpDialog({ company, onClose }: { company?: string; onClose: ()
         {company && <Text>{t("shell.company", { name: company })}</Text>}
         <Text>{t("shell.namespace", { id: CANDIDATE_ID })}</Text>
       </div>
-    </Dialog>
+    </CloseDialog>
   );
 }

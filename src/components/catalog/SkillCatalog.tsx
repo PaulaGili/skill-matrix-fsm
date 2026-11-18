@@ -4,11 +4,7 @@ import { useState } from "react";
 import "@ui5/webcomponents-fiori/dist/illustrations/NoEntries.js";
 import {
   Button,
-  FilterBar,
-  FilterGroupItem,
-  Icon,
   IllustratedMessage,
-  Input,
   Link,
   Table,
   TableCell,
@@ -29,6 +25,7 @@ import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { PageFilters, searchFilter } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { RemoveSkillDialog } from "./RemoveSkillDialog";
 import { SkillDialog } from "./SkillDialog";
@@ -102,36 +99,19 @@ export function SkillCatalog() {
       {error && <LoadError message={error} onRetry={reload} />}
 
       {skills.length > 0 && (
-        <FilterBar
-          className={shell.filterBar}
-          filterContainerWidth="13rem"
-          hideFilterConfiguration
-          hideToggleFiltersButton
-          hideToolbar
-          showClearOnFB={search !== ""}
-          onClear={() => setSearch("")}
-        >
-          <FilterGroupItem filterKey="skill" label={t("field.skill")}>
-            <Input
-              placeholder={t("catalog.search")}
-              accessibleName={t("catalog.search")}
-              showClearIcon
-              icon={<Icon name="search" />}
-              value={search}
-              onInput={(event) => setSearch(event.target.value)}
-            />
-          </FilterGroupItem>
-        </FilterBar>
+        <PageFilters active={search !== ""} onClear={() => setSearch("")}>
+          {searchFilter({ filterKey: "skill", label: t("field.skill"), placeholder: t("catalog.search"), value: search, onChange: setSearch })}
+        </PageFilters>
       )}
-      {skills.length > 0 && shown.length === 0 && <Text>{t("catalog.noMatch")}</Text>}
 
       {skills.length === 0 ? (
         <IllustratedMessage name="NoEntries" titleText={t("matrix.noSkillsTitle")} subtitleText={t("catalog.emptyText")}>
           <Button onClick={() => setDialog({ type: "create" })}>{t("catalog.create")}</Button>
         </IllustratedMessage>
-      ) : shown.length === 0 ? null : (
+      ) : (
         <Table
           loading={loading}
+          noDataText={t("catalog.noMatch")}
           accessibleName={t("catalog.tableName")}
           overflowMode="Popin"
           headerRow={

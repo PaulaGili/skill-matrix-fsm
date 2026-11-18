@@ -1,30 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FilterBar, FilterGroupItem, Option, Select } from "@ui5/webcomponents-react";
+import { FilterGroupItem, Option, Select } from "@ui5/webcomponents-react";
+import { PageFilters } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { LoadError, Loading } from "@/components/common/LoadState";
-import { AssignmentsTable } from "@/components/common/AssignmentsTable";
+import { AssignmentsTable, rowsOfPerson } from "@/components/common/AssignmentsTable";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { buildCells, cellKey, filterPersons } from "@/lib/domain/matrix";
+import { buildCells, filterPersons } from "@/lib/domain/matrix";
 import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { readStored, store } from "@/lib/storage";
 
 const ME_KEY = "me:personId";
-function loadMe(): string {
-  try {
-    return localStorage.getItem(ME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
 
 // The view of a technician: the own skills, their validity and the certificates, read-only.
 // The app has no login, so the technician picks the name once and the browser remembers it.
 export function MySkills() {
-  const { data, error, reload } = useAsyncData(loadMatrixData);
-  const [personId, setPersonId] = useState(loadMe);
+  const { data, error, loading, reload } = useAsyncData(loadMatrixData);
+  const [personId, setPersonId] = useState(() => readStored(ME_KEY) ?? "");
   const { t } = useI18n();
   const today = todayIso();
   const cells = useMemo(
@@ -39,17 +34,10 @@ export function MySkills() {
 
   function choose(id: string) {
     setPersonId(id);
-    try {
-      localStorage.setItem(ME_KEY, id);
-    } catch {}
+    store(ME_KEY, id);
   }
 
-  const rows = me
-    ? data.skills.flatMap((skill) => {
-        const cell = cells.get(cellKey(me.id, skill.id));
-        return cell ? [{ name: skill.name, personName: me.displayName, skillName: skill.name, assignment: cell.assignment, status: cell.status }] : [];
-      })
-    : [];
+  const rows = me ? rowsOfPerson(me, data.skills, cells) : [];
 
   return (
     <div className={shell.panel}>
@@ -61,9 +49,11 @@ export function MySkills() {
         firstColumn="field.skill"
         rows={rows}
         certificates={data.certificates}
+        loading={loading}
+        onRefresh={reload}
         filters={
-          <FilterBar className={shell.filterBar} filterContainerWidth="13rem" hideFilterConfiguration hideToggleFiltersButton hideToolbar>
-            <FilterGroupItem filterKey="person" label={t("field.person")}>
+          <PageFilters>
+            <FilterGroupItem filterKey="person" label={t("field.person")} className={shell.filterItem}>
               <Select id="me-person" accessibleName={t("me.choose")} onChange={(event) => choose(event.detail.selectedOption.dataset.id ?? "")}>
                 <Option data-id="" selected={!me}>
                   {t("me.choose")}
@@ -75,7 +65,7 @@ export function MySkills() {
                 ))}
               </Select>
             </FilterGroupItem>
-          </FilterBar>
+          </PageFilters>
         }
       />
     </div>

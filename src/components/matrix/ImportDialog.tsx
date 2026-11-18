@@ -18,17 +18,7 @@ import {
 } from "@ui5/webcomponents-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { matchImportColumns } from "@/lib/ai/client";
-import {
-  IMPORT_FIELDS,
-  MAX_IMPORT_ROWS,
-  guessColumns,
-  isEmptyRow,
-  parseCsv,
-  toImportRows,
-  unusedColumns,
-  withProposed,
-  type ColumnMap,
-} from "@/lib/domain/import";
+import { IMPORT_FIELDS, MAX_IMPORT_ROWS, guessColumns, isEmptyRow, toImportRows, unusedColumns, withProposed, type ColumnMap } from "@/lib/domain/import";
 import { formatDate } from "@/lib/domain/status";
 import { toUserMessage } from "@/lib/fsm/errors";
 import { createAssignments } from "@/lib/fsm/services/assignments";
@@ -37,6 +27,7 @@ import { listLevels } from "@/lib/fsm/services/scale";
 import { recordAssigned } from "@/lib/history/store";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { SortButton, useSort, type SortColumn } from "@/components/common/useSort";
+import { readRows } from "./readRows";
 import styles from "./ImportDialog.module.css";
 
 interface Props {
@@ -53,25 +44,10 @@ interface Sheet {
   headers: string[];
   rows: unknown[][];
   columns: ColumnMap;
-  byAi: boolean;
+  askedAi: boolean;
+  byAi: boolean; // the AI filled at least one field
 }
 
-async function readRows(file: File): Promise<unknown[][]> {
-  if (file.name.toLowerCase().endsWith(".csv")) {
-    // Excel on Windows saves CSV files in its own encoding, not UTF-8.
-    const bytes = await file.arrayBuffer();
-    try {
-      return parseCsv(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-    } catch {
-      return parseCsv(new TextDecoder("windows-1252").decode(bytes));
-    }
-  }
-  const { readSheet } = await import("read-excel-file/browser");
-  return readSheet(file);
-}
-
-// Creates assignments from a file. Every row is shown first with what it would create or why
-// it cannot be imported, and only the ticked rows are saved.
 const SORT_COLUMNS: SortColumn[] = [
   { key: "line", label: "import.row" },
   { key: "person", label: "field.person" },
@@ -82,6 +58,8 @@ const SORT_COLUMNS: SortColumn[] = [
   { key: "result", label: "import.result" },
 ];
 
+// Creates assignments from a file. Every row is shown first with what it would create or why
+// it cannot be imported, and only the ticked rows are saved.
 export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, onSaved, onChanged }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [skipped, setSkipped] = useState<number[]>([]);
@@ -97,7 +75,8 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
   }, [skills]);
   const { data: levels, error: levelsError } = useAsyncData(loadLevels);
 
-  const rows = sheet && levels ? toImportRows(sheet.rows, sheet.columns, { persons, skills, levels, isAssigned }) : [];
+  const ready = sheet !== null && sheet.columns.person !== null && sheet.columns.skill !== null;
+  const rows = ready && levels ? toImportRows(sheet.rows, sheet.columns, { persons, skills, levels, isAssigned }) : [];
   const chosen = rows.filter((row) => !row.problem && !skipped.includes(row.line));
   const allLevels = Object.values(levels ?? {}).flat();
   const levelName = (levelId: string | null) => allLevels.find((level) => level.id === levelId)?.name ?? "";
@@ -123,47 +102,42 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
       const count = body.filter((row) => !isEmptyRow(row)).length;
       if (headers.length === 0 || count === 0) setError(t("import.unreadable"));
       else if (count > MAX_IMPORT_ROWS) setError(t("import.tooMany", { count, max: MAX_IMPORT_ROWS }));
-      else {
-        // Usual titles are matched here. For a title that is left over the AI is asked, with
-        // the titles alone, and it only fills fields that are still open.
-        let columns = guessColumns(headers);
-        let byAi = false;
-        const left = unusedColumns(headers, columns);
-        if (aiEnabled && left.length > 0 && Object.values(columns).includes(null)) {
-          // If the AI cannot be reached, the import goes on with what the code recognised.
-          const proposed = await matchImportColumns(left.map((column) => headers[column])).catch(() => null);
-          const filled = proposed ? withProposed(columns, proposed, left) : columns;
-          byAi = IMPORT_FIELDS.some((field) => filled[field] !== columns[field]);
-          columns = filled;
-        }
-        if (columns.person === null || columns.skill === null) setError(t("import.noColumns"));
-        else setSheet({ headers, rows: body, columns, byAi });
-      }
+      else setSheet({ headers, rows: body, columns: guessColumns(headers), askedAi: false, byAi: false });
     } catch (e) {
       setError(toUserMessage(e, t));
     }
     setBusy(false);
   }
 
-  // One request per skill. If one fails, the rows saved before it show as already assigned.
+  // Only on a click: the titles the code did not recognise go to the AI, which fills the
+  // fields that are still open. The rows below the first one stay in the browser.
+  async function matchWithAi(sheet: Sheet) {
+    setBusy(true);
+    setError(null);
+    try {
+      const left = unusedColumns(sheet.headers, sheet.columns);
+      const proposed = await matchImportColumns(left.map((column) => sheet.headers[column]));
+      const columns = withProposed(sheet.columns, proposed, left);
+      setSheet({ ...sheet, columns, askedAi: true, byAi: IMPORT_FIELDS.some((field) => columns[field] !== sheet.columns[field]) });
+    } catch (e) {
+      setError(toUserMessage(e, t));
+    }
+    setBusy(false);
+  }
+
+  // One request for all rows. If it fails, the matrix reloads and shows what was saved.
   async function importRows() {
     setBusy(true);
     setError(null);
-    let done = 0;
     try {
-      for (const skill of skills) {
-        const forSkill = chosen.filter((row) => row.skillId === skill.id);
-        if (forSkill.length === 0) continue;
-        const created = await createAssignments(
-          skill.id,
-          forSkill.map((row) => ({ personId: row.personId!, levelId: row.levelId, startDate: row.startDate, endDate: row.endDate })),
-        );
-        done += created.length;
-        for (const assignment of created) {
-          recordAssigned(skill.name, persons.find((person) => person.id === assignment.personId)?.displayName ?? "", assignment);
-        }
+      const created = await createAssignments(
+        chosen.map((row) => ({ skillId: row.skillId!, personId: row.personId!, levelId: row.levelId, startDate: row.startDate, endDate: row.endDate })),
+      );
+      for (const assignment of created) {
+        const skill = skills.find((s) => s.id === assignment.skillId)?.name ?? "";
+        recordAssigned(skill, persons.find((person) => person.id === assignment.personId)?.displayName ?? "", assignment);
       }
-      onSaved(t("import.done", { count: done }));
+      onSaved(t("import.done", { count: created.length }));
     } catch (e) {
       setError(toUserMessage(e, t));
       setBusy(false);
@@ -172,6 +146,7 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
   }
 
   const notUsed = sheet ? unusedColumns(sheet.headers, sheet.columns).map((column) => sheet.headers[column]) : [];
+  const canAskAi = aiEnabled && sheet !== null && !sheet.askedAi && notUsed.length > 0 && Object.values(sheet.columns).includes(null);
   const usedColumns = sheet
     ? IMPORT_FIELDS.filter((field) => sheet.columns[field] !== null)
         .map((field) => sheet.headers[sheet.columns[field]!])
@@ -218,7 +193,18 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
           </Button>
         </FileUploader>
 
-        {sheet && (
+        {sheet && !ready && (
+          <MessageStrip design="Negative" hideCloseButton>
+            {t("import.noColumns")}
+          </MessageStrip>
+        )}
+        {sheet && canAskAi && (
+          <Button icon="ai" disabled={busy} tooltip={t("import.matchWithAiHelp")} onClick={() => matchWithAi(sheet)}>
+            {t("import.matchWithAi")}
+          </Button>
+        )}
+        {sheet && sheet.askedAi && !sheet.byAi && <Text>{t("import.aiFoundNothing")}</Text>}
+        {sheet && ready && (
           <>
             <Text>
               {t("import.columns", { columns: usedColumns })} {sheet.byAi && t("import.columnsByAi")}

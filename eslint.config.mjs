@@ -7,7 +7,6 @@ export default defineConfig([
   {
     extends: [...nextCoreWebVitals, ...nextTypescript],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },

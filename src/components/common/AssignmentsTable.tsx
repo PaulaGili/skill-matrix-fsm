@@ -3,9 +3,9 @@
 import { useState, type ReactNode } from "react";
 import { Link, Table, TableCell, TableHeaderCell, TableHeaderRow, TableRow, Text, Title } from "@ui5/webcomponents-react";
 import { CertificateDialog } from "@/components/assignment/CertificateDialog";
-import { statusRank } from "@/lib/domain/matrix";
+import { cellKey, statusRank, type Cell } from "@/lib/domain/matrix";
 import { formatDate, type AssignmentStatus } from "@/lib/domain/status";
-import type { Assignment, Certificate } from "@/lib/fsm/services/model";
+import type { Assignment, Certificate, Person, Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n/translate";
 import shell from "./AppShell.module.css";
@@ -23,6 +23,14 @@ export interface AssignmentRow {
   status: AssignmentStatus;
 }
 
+// The skills one person holds, as rows of the table below.
+export function rowsOfPerson(person: Person, skills: Skill[], cells: Map<string, Cell<Assignment>>): AssignmentRow[] {
+  return skills.flatMap((skill) => {
+    const cell = cells.get(cellKey(person.id, skill.id));
+    return cell ? [{ name: skill.name, personName: person.displayName, skillName: skill.name, assignment: cell.assignment, status: cell.status }] : [];
+  });
+}
+
 interface Props {
   exportName: string; // start of the export file name
   title: string;
@@ -31,11 +39,13 @@ interface Props {
   rows: AssignmentRow[];
   certificates: Certificate[];
   filters?: ReactNode; // a filter bar between the title and the table
+  loading?: boolean;
+  onRefresh?: () => void;
 }
 
 // Assignments with level, status, validity and certificates, read-only. The person view
 // lists the skills of one person with it, the skill view the persons of one skill.
-export function AssignmentsTable({ exportName, title, emptyText, firstColumn, rows, certificates, filters }: Props) {
+export function AssignmentsTable({ exportName, title, emptyText, firstColumn, rows, certificates, filters, loading, onRefresh }: Props) {
   const { t } = useI18n();
   const [viewed, setViewed] = useState<{ certificate: Certificate; title: string } | null>(null);
   const sort = useSort();
@@ -77,7 +87,17 @@ export function AssignmentsTable({ exportName, title, emptyText, firstColumn, ro
     <div className={styles.content}>
       <div className={shell.header}>
         <Title level="H3">{title}</Title>
-        {rows.length > 0 && <PageToolbar name={exportName} getRows={exportRows} canExport onError={showToast} sorting={{ columns, sort }} />}
+        {(rows.length > 0 || onRefresh) && (
+          <PageToolbar
+            name={exportName}
+            getRows={exportRows}
+            canExport={rows.length > 0}
+            onError={showToast}
+            sorting={{ columns, sort }}
+            loading={loading}
+            onRefresh={onRefresh}
+          />
+        )}
       </div>
       {filters}
       {rows.length === 0 ? (
