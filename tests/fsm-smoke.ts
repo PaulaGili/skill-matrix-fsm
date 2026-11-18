@@ -8,7 +8,7 @@ import { certificateUrl, listCertificates } from "@/lib/fsm/services/certificate
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import { OwnershipError } from "@/lib/fsm/services/ownership";
 import { listActivePersons } from "@/lib/fsm/services/persons";
-import { deleteSkillWithAssignments, retireSkill } from "@/lib/fsm/services/remove";
+import { deleteSkillWithAssignments, removeAssignments, retireSkill } from "@/lib/fsm/services/remove";
 import { saveAssignment } from "@/lib/fsm/services/save-assignment";
 import { ensureLevelScale } from "@/lib/fsm/services/scale";
 import { SkillInUseError, createSkill, deleteSkill, listSkills, updateSkill } from "@/lib/fsm/services/skills";
@@ -57,16 +57,24 @@ run(async () => {
     const second = await createAssignment(skill.id, employees[1].id, { levelId: basic.id, startDate: null, endDate: null });
     assert.equal(second.startDate, todayIso(), "an empty start date means today");
 
+    // FSM sets the default level on create, so "no level" has to be cleared afterwards.
+    const noLevel = await createAssignment(skill.id, employees[2].id, { levelId: null, startDate: null, endDate: null });
+    assert.equal(noLevel.levelId, null);
+    assert.equal((await listAssignments()).find((a) => a.id === noLevel.id)?.levelId, null, "no level reads back as no level");
+    await assert.rejects(createAssignment(skill.id, employees[2].id, { levelId: null, startDate: null, endDate: null }), /already has/);
+    await removeAssignments(skill.id, [noLevel.id]);
+
     // One good file and one of a type that is not allowed: the good one is still uploaded.
     const file = sampleCertificate("smoke-test.pdf");
     const unchanged = { levelId: updated.levelId, startDate: updated.startDate, endDate: updated.endDate };
-    const failures = await saveAssignment(skill.id, employees[0].id, updated, {
+    const { failures } = await saveAssignment(skill.id, employees[0].id, updated, {
       input: unchanged,
       deleteCertificateIds: [],
       uploads: [file, { ...file, fileName: "notes.txt" }, { ...file, fileName: "to-delete.pdf" }],
     });
     assert.equal(failures.length, 1);
-    assert.match(failures[0], /notes\.txt/);
+    assert.match(failures[0].message, /notes\.txt/);
+    assert.equal(failures[0].index, 1);
     const uploaded = (await listCertificates()).filter((c) => c.assignmentId === first.id);
     assert.deepEqual(uploaded.map((c) => c.fileName).sort(), ["smoke-test.pdf", "to-delete.pdf"]);
     const certificate = uploaded.find((c) => c.fileName === "smoke-test.pdf")!;
@@ -83,14 +91,17 @@ run(async () => {
     assert.ok(matrix.skills.some((s) => s.id === skill.id));
     assert.ok(matrix.assignments.some((a) => a.id === first.id));
 
-    // Retire: assignments valid today end yesterday, later ones are removed, certificates stay.
-    // The second assignment started today, so it is removed together with the future one.
+    // Retire: assignments valid today end yesterday, or today when they started today.
+    // The one that starts later is removed. Certificates stay.
     await createAssignment(skill.id, employees[2].id, { levelId: basic.id, startDate: addDays(todayIso(), 10), endDate: null });
     await retireSkill(skill.id);
     const retired = (await listAssignments()).filter((a) => a.skillId === skill.id);
     assert.deepEqual(
-      retired.map((a) => [a.id, a.endDate]),
-      [[first.id, addDays(todayIso(), -1)]],
+      new Map(retired.map((a) => [a.id, a.endDate])),
+      new Map([
+        [first.id, addDays(todayIso(), -1)],
+        [second.id, todayIso()],
+      ]),
     );
     assert.ok(
       (await listCertificates()).some((c) => c.id === certificate.id),

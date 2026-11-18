@@ -6,6 +6,7 @@
 }
 
 .form > [ui5-select],
+.form > [ui5-multi-combobox],
 .form > [ui5-date-picker] {
   width: 100%;
 }
@@ -70,4 +71,22 @@
   display: grid;
   gap: 0.5rem;
   justify-items: start;
+}
+
+.preview {
+  width: 100%;
+  height: 22rem;
+  border: 1px solid var(--sapList_BorderColor);
+  object-fit: contain;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.personDates {
+  display: grid;
+  gap: 0.25rem;
 }

@@ -41,21 +41,24 @@ export function cellKey(personId: string, skillId: string): string {
   return `${personId}|${skillId}`;
 }
 
-// The matrix shows one assignment per person and skill. FSM allows several, so the one
-// that stays valid longest wins.
-export function indexAssignments<A extends AssignmentLike>(assignments: A[]): Map<string, A> {
+// The matrix shows one assignment per person and skill. FSM allows several, so the one that
+// is valid today wins, and among equals the one that stays valid longest.
+export function indexAssignments<A extends AssignmentLike>(assignments: A[], today: string): Map<string, A> {
+  const end = (a: A) => a.endDate ?? OPEN_END_DATE;
+  const current = (a: A) => (a.startDate ?? "") <= today && end(a) >= today;
   const byCell = new Map<string, A>();
   for (const assignment of assignments) {
     const key = cellKey(assignment.personId, assignment.skillId);
-    const current = byCell.get(key);
-    if (!current || (assignment.endDate ?? OPEN_END_DATE) > (current.endDate ?? OPEN_END_DATE)) byCell.set(key, assignment);
+    const shown = byCell.get(key);
+    const better = !shown || (current(assignment) !== current(shown) ? current(assignment) : end(assignment) > end(shown));
+    if (better) byCell.set(key, assignment);
   }
   return byCell;
 }
 
 export function buildCells<A extends AssignmentLike>(assignments: A[], assignmentsWithCertificate: Set<string>, today: string): Map<string, Cell<A>> {
   const cells = new Map<string, Cell<A>>();
-  for (const [key, assignment] of indexAssignments(assignments)) {
+  for (const [key, assignment] of indexAssignments(assignments, today)) {
     cells.set(key, { assignment, status: assignmentStatus(assignment, today), hasCertificate: assignmentsWithCertificate.has(assignment.id) });
   }
   return cells;
@@ -63,10 +66,6 @@ export function buildCells<A extends AssignmentLike>(assignments: A[], assignmen
 
 // In the order the statuses are listed in the assignment.
 export const CELL_FILTERS: CellFilter[] = ["valid", "expiring", "expired", "notYetValid", "noCertificate"];
-
-export function cellMatches(cell: Cell<AssignmentLike>, filter: CellFilter): boolean {
-  return filter === "noCertificate" ? !cell.hasCertificate : cell.status === filter;
-}
 
 // A skill someone can be sent out with today. The matrix switches these two on when a
 // skill is selected, so the default is visible and can be changed.

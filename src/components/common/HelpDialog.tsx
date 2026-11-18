@@ -38,12 +38,16 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           are shown; the rest of the row is left blank and skills without a match are hidden. Click a button again to switch it off.
         </Text>
         <Text>System users are the login accounts of the same persons. They are hidden unless you switch them on.</Text>
+        <Text>Assign to several gives one skill to up to 20 persons at once, with the same level and the same or separate dates.</Text>
 
         <Title level="H5">Skill catalogue</Title>
         <Text>
           Create, rename and delete skills. A skill that is still assigned can be retired, which ends its valid assignments and keeps the history and
-          certificates, or deleted together with everything attached to it.
+          certificates; assignments that start after today are removed. Or it can be deleted together with everything attached to it.
         </Text>
+
+        <Title level="H5">Expiring</Title>
+        <Text>Every assignment that ends within the next 30, 60, 90 or 180 days, soonest first. Edit a row to renew it or to add the new certificate.</Text>
       </div>
     </Dialog>
   );

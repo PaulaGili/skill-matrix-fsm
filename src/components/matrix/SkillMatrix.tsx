@@ -13,7 +13,9 @@ import {
   type AnalyticalTableColumnDefinition,
 } from "@ui5/webcomponents-react";
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
+import { BulkAssignDialog } from "@/components/assignment/BulkAssignDialog";
 import shell from "@/components/common/AppShell.module.css";
+import { ExportButton } from "@/components/common/ExportDialog";
 import { LoadError, Loading } from "@/components/common/LoadState";
 import { STATUS_LABELS } from "@/components/common/StatusBadge";
 import { useToast } from "@/components/common/useToast";
@@ -33,7 +35,6 @@ import { matrixTable } from "@/lib/domain/export";
 import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Person, Skill } from "@/lib/fsm/services/model";
-import { ExportMenu } from "./ExportMenu";
 import { MatrixCell } from "./MatrixCell";
 import { MatrixFilters } from "./MatrixFilters";
 import styles from "./SkillMatrix.module.css";
@@ -49,19 +50,23 @@ export function SkillMatrix() {
   const router = useRouter();
   const { data, error, loading, reload } = useAsyncData(loadMatrixData);
   const [search, setSearch] = useState("");
-  const [skillIds, setSkillIds] = useState<string[]>([]);
+  const [pickedSkillIds, setSkillIds] = useState<string[]>([]);
   const [showSystemUsers, setShowSystemUsers] = useState(false);
   const [statusFilters, setStatusFilters] = useState<CellFilter[]>([]);
   const [levels, setLevels] = useState<string[]>([]);
   const [selected, setSelected] = useState<{ person: Person; skill: Skill } | null>(null);
+  const [assigningSeveral, setAssigningSeveral] = useState(false);
   const { toastElement, showToast } = useToast();
   const today = todayIso();
 
   // Selecting the first skill switches on Valid and Expiring soon: "who can do this today?".
   function selectSkills(ids: string[]) {
-    if (skillIds.length === 0 && ids.length > 0 && statusFilters.length === 0) setStatusFilters(HELD_TODAY);
+    if (pickedSkillIds.length === 0 && ids.length > 0 && statusFilters.length === 0) setStatusFilters(HELD_TODAY);
     setSkillIds(ids);
   }
+
+  // A selected skill that was deleted in the meantime no longer filters.
+  const skillIds = useMemo(() => pickedSkillIds.filter((id) => data?.skills.some((skill) => skill.id === id)), [pickedSkillIds, data]);
 
   const cells = useMemo(
     () => buildCells(data?.assignments ?? [], new Set(data?.certificates.map((certificate) => certificate.assignmentId)), today),
@@ -143,7 +148,16 @@ export function SkillMatrix() {
         <Title level="H2">Skill matrix</Title>
         <span className={styles.inline}>
           {data.skills.length > 0 && (
-            <ExportMenu getRows={() => matrixTable(persons, skills, cells, filters, (status) => STATUS_LABELS[status].text)} onError={showToast} />
+            <ExportButton
+              name="skill-matrix"
+              getRows={() => matrixTable(persons, skills, cells, filters, (status) => STATUS_LABELS[status].text)}
+              onError={showToast}
+            />
+          )}
+          {data.skills.length > 0 && (
+            <Button icon="add-employee" tooltip="Assign one skill to several persons at once" onClick={() => setAssigningSeveral(true)}>
+              Assign to several
+            </Button>
           )}
           <Button icon="refresh" tooltip="Load the current data from SAP FSM" disabled={loading} onClick={reload}>
             Refresh
@@ -200,10 +214,23 @@ export function SkillMatrix() {
           skill={selected.skill}
           assignment={selectedAssignment}
           certificates={data.certificates.filter((certificate) => certificate.assignmentId === selectedAssignment?.id)}
-          reloading={loading}
           onClose={() => setSelected(null)}
           onSaved={(message) => {
             setSelected(null);
+            showToast(message);
+            reload();
+          }}
+          onChanged={reload}
+        />
+      )}
+      {assigningSeveral && (
+        <BulkAssignDialog
+          skills={data.skills}
+          persons={data.persons.filter((person) => person.isTechnician)}
+          isAssigned={(personId, skillId) => cells.has(cellKey(personId, skillId))}
+          onClose={() => setAssigningSeveral(false)}
+          onSaved={(message) => {
+            setAssigningSeveral(false);
             showToast(message);
             reload();
           }}

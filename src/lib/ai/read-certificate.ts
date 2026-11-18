@@ -8,7 +8,6 @@ const MODEL = "claude-opus-5-5";
 
 const FactsSchema = z.object({
   holderName: z.string().nullable().describe("Full name of the person the certificate is issued to"),
-  title: z.string().nullable().describe("What the certificate is for"),
   validFrom: z.string().nullable().describe("Issue date or start of validity, as yyyy-MM-dd"),
   validTo: z.string().nullable().describe("Expiry date or end of validity, as yyyy-MM-dd"),
 });

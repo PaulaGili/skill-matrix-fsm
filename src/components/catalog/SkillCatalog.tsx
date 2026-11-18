@@ -58,6 +58,7 @@ export function SkillCatalog() {
         <Table
           loading={loading}
           accessibleName="Skills"
+          overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
               <TableHeaderCell minWidth="12rem">Name</TableHeaderCell>

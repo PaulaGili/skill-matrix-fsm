@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildCells,
   cellKey,
-  cellMatches,
   HELD_TODAY,
   cellPasses,
   filterPersons,
@@ -61,30 +60,32 @@ const assignment = (id: string, endDate: string | null, startDate = "2026-01-01"
 });
 
 describe("indexAssignments", () => {
+  const key = cellKey("p1", "s1");
+
   it("keeps the assignment that is valid longest when FSM has duplicates", () => {
     const expired = assignment("old", "2026-01-31");
     const current = assignment("new", "2027-01-31");
     const open = assignment("open", null);
-    expect(indexAssignments([current, expired]).get(cellKey("p1", "s1"))).toBe(current);
-    expect(indexAssignments([expired, current]).get(cellKey("p1", "s1"))).toBe(current);
-    expect(indexAssignments([current, open, expired]).get(cellKey("p1", "s1"))).toBe(open);
+    expect(indexAssignments([current, expired], TODAY).get(key)).toBe(current);
+    expect(indexAssignments([expired, current], TODAY).get(key)).toBe(current);
+    expect(indexAssignments([current, open, expired], TODAY).get(key)).toBe(open);
+  });
+
+  it("prefers the assignment that is valid today over a renewal that starts later", () => {
+    const current = assignment("current", "2026-12-31");
+    const renewal = assignment("renewal", "2028-12-31", "2027-01-01");
+    expect(indexAssignments([current, renewal], TODAY).get(key)).toBe(current);
+    expect(indexAssignments([renewal, current], TODAY).get(key)).toBe(current);
   });
 });
 
-describe("buildCells and cellMatches", () => {
+describe("buildCells", () => {
   const cells = buildCells([assignment("a1", "2026-11-20")], new Set(["a1"]), TODAY);
   const cell = cells.get(cellKey("p1", "s1"))!;
 
   it("adds the status and the certificate flag", () => {
     expect(cell.status).toBe("expiring");
     expect(cell.hasCertificate).toBe(true);
-  });
-
-  it("matches a status filter or the missing-certificate filter", () => {
-    expect(cellMatches(cell, "expiring")).toBe(true);
-    expect(cellMatches(cell, "expired")).toBe(false);
-    expect(cellMatches(cell, "noCertificate")).toBe(false);
-    expect(cellMatches({ ...cell, hasCertificate: false }, "noCertificate")).toBe(true);
   });
 });
 

@@ -13,7 +13,7 @@ export async function readCertificateFacts(file: File): Promise<CertificateFacts
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ fileName: file.name, base64: await fileToBase64(file) }),
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "The certificate could not be read.");
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) throw new Error(data?.error ?? "The certificate could not be read.");
   return data;
 }

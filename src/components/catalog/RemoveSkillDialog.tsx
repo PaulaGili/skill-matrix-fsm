@@ -111,9 +111,9 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
         )}
         {toEnd.length > 0 && (
           <Text>
-            <b>Retire skill</b> ends the {plural(toEnd.length, "valid assignment")} as of yesterday, so {toEnd.length === 1 ? "it shows" : "they show"} as
-            expired. The history and certificates are kept.
-            {toRemove.length > 0 && ` ${plural(toRemove.length, "assignment")} starting today or later ${toRemove.length === 1 ? "is" : "are"} removed.`}
+            <b>Retire skill</b> ends the {plural(toEnd.length, "valid assignment")} as of yesterday, or today for one that started today. The history and
+            certificates are kept.
+            {toRemove.length > 0 && ` ${plural(toRemove.length, "assignment")} starting after today ${toRemove.length === 1 ? "is" : "are"} removed.`}
           </Text>
         )}
         {assigned && (

@@ -28,6 +28,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
   }
 
   async function save() {
+    if (saving) return; // Enter pressed twice
     const error = validate();
     setNameError(error);
     if (error) return;

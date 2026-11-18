@@ -10,6 +10,7 @@ import styles from "./AppShell.module.css";
 const PAGES = [
   { path: "/", title: "Skill matrix" },
   { path: "/catalog", title: "Skill catalogue" },
+  { path: "/expiry", title: "Expiring" },
 ];
 
 function useConnection(): string {
