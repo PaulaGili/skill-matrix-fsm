@@ -12,7 +12,7 @@ I hope you like it.
 
 ## A quick tour
 
-The screenshots show the demo mode, which runs on invented data. The AI is switched off there, so the two AI pictures show the answers the model gave to the same inputs in the evaluation.
+The screenshots show the demo mode, which runs on invented data. The AI is switched off there, so in the three AI pictures the answer of the model was put in by hand: for "Ask" and "Read dates" the one it gave in the evaluation, for the pile of certificates an example.
 
 ### The matrix
 
@@ -81,6 +81,12 @@ Most teams already keep this list in Excel. Every row is checked and says why it
 ![The import preview: two rows ready, four rows with the reason why not](docs/images/import.png)
 
 Want to try it? The [`samples`](samples) folder has three files ready, one of them full of mistakes on purpose.
+
+### A pile of certificates
+
+The training centre sends ten PDFs. Choose them all at once: the AI reads holder, skill and dates from each, the code checks every row against FSM, and you tick what goes in. Each file ends up attached to its assignment.
+
+![The import preview filled from five certificates: two rows ready, three with the reason why not](docs/images/import-certificates.png)
 
 ### Auch auf Deutsch
 

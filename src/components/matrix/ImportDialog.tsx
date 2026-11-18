@@ -310,7 +310,7 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
               headerRow={
                 <TableHeaderRow>
                   <TableHeaderCell width="3rem" />
-                  <TableHeaderCell width={sheet.certificates ? "10rem" : "4rem"} sortIndicator={sort.indicator("line")}>
+                  <TableHeaderCell width={sheet.certificates ? "8rem" : "4rem"} sortIndicator={sort.indicator("line")}>
                     {t(sheet.certificates ? "import.file" : "import.row")}
                   </TableHeaderCell>
                   <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("person")}>

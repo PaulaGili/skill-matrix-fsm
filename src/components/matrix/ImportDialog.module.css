@@ -1,8 +1,10 @@
 .content {
   display: grid;
+  /* Without minmax(0, ...) the table makes the dialog wider than the screen. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
   justify-items: start;
-  width: min(64rem, 90vw);
+  width: min(64rem, calc(90vw - 4rem));
   padding: 0.5rem 0;
 }
 
