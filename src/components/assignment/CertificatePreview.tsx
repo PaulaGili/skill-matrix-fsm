@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BusyIndicator, Text } from "@ui5/webcomponents-react";
 import { certificateUrl } from "@/lib/fsm/services/certificates";
 import type { Certificate } from "@/lib/fsm/services/model";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import styles from "./AssignmentDialog.module.css";
 
 // FSM serves attachments as downloads, so the file is loaded here and shown from memory.
@@ -11,6 +12,8 @@ export function CertificatePreview({ certificate }: { certificate: Certificate }
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const isPdf = certificate.type === "PDF";
+  const { t } = useI18n();
+  const title = t("certificate.previewOf", { file: certificate.fileName });
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -29,12 +32,12 @@ export function CertificatePreview({ certificate }: { certificate: Certificate }
     };
   }, [certificate, isPdf]);
 
-  if (failed) return <Text className={styles.error}>The preview could not be loaded. Open the file instead.</Text>;
+  if (failed) return <Text className={styles.error}>{t("certificate.previewFailed")}</Text>;
   if (!url) return <BusyIndicator active delay={0} />;
   return isPdf ? (
-    <iframe className={styles.preview} src={url} title={`Preview of ${certificate.fileName}`} />
+    <iframe className={styles.preview} src={url} title={title} />
   ) : (
     // eslint-disable-next-line @next/next/no-img-element -- a blob URL, not a static asset
-    <img className={styles.preview} src={url} alt={`Preview of ${certificate.fileName}`} />
+    <img className={styles.preview} src={url} alt={title} />
   );
 }

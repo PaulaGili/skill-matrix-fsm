@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { matrixTable, safeCell, toCsv } from "@/lib/domain/export";
 import { buildCells } from "@/lib/domain/matrix";
+import { translator } from "@/lib/i18n/translate";
 
 const TODAY = "2026-11-16";
-const STATUS_TEXT = { unassigned: "Not assigned", notYetValid: "Not yet valid", valid: "Valid", expiring: "Expiring soon", expired: "Expired" };
 
 describe("matrixTable", () => {
   const persons = [
@@ -24,7 +24,7 @@ describe("matrixTable", () => {
   );
 
   it("has a header row and one row per person", () => {
-    expect(matrixTable(persons, skills, cells, { statuses: [], levels: [] }, (status) => STATUS_TEXT[status])).toEqual([
+    expect(matrixTable(persons, skills, cells, { statuses: [], levels: [] }, translator("en"))).toEqual([
       ["Person", "Welding", "First Aid"],
       ["Bieri, Marco", "Valid, Expert, no end date, certificate", "Expired, ended 01.11.2026"],
       ["Graf, Eva", "", ""],
@@ -32,8 +32,14 @@ describe("matrixTable", () => {
   });
 
   it("leaves out the cells that the filters hide", () => {
-    const table = matrixTable(persons, skills, cells, { statuses: ["expired"], levels: [] }, (status) => STATUS_TEXT[status]);
+    const table = matrixTable(persons, skills, cells, { statuses: ["expired"], levels: [] }, translator("en"));
     expect(table[1]).toEqual(["Bieri, Marco", "", "Expired, ended 01.11.2026"]);
+  });
+
+  it("writes the cell texts in German, with the names as they are", () => {
+    const table = matrixTable(persons, skills, cells, { statuses: [], levels: [] }, translator("de"));
+    expect(table[0]).toEqual(["Person", "Welding", "First Aid"]);
+    expect(table[1]).toEqual(["Bieri, Marco", "Gültig, Expert, kein Enddatum, Zertifikat", "Abgelaufen, beendet am 01.11.2026"]);
   });
 });
 

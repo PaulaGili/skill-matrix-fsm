@@ -32,6 +32,7 @@ import { filterPersons } from "@/lib/domain/matrix";
 import { formatDate, todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Assignment, Person, Skill } from "@/lib/fsm/services/model";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import styles from "./ExpiryList.module.css";
 
 const WINDOWS = [30, 60, 90, 180];
@@ -47,6 +48,7 @@ export function ExpiryList() {
   const [noCertificate, setNoCertificate] = useState(false);
   const [selected, setSelected] = useState<{ assignment: Assignment; person: Person; skill: Skill } | null>(null);
   const { toastElement, showToast } = useToast();
+  const { t } = useI18n();
 
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
@@ -64,17 +66,21 @@ export function ExpiryList() {
       (levels.length === 0 || levels.includes(assignment.levelName ?? "")) &&
       (!noCertificate || !hasCertificate(assignment)),
   );
+  const due = (assignment: Assignment) => {
+    const message = dueText(daysUntil(assignment.endDate!, today));
+    return t(message.key, message.params);
+  };
   const levelNames = [...new Set(data.assignments.map((assignment) => assignment.levelName).filter((name) => name !== null))];
 
   const exportRows = () => [
-    ["Valid to", "Ends", "Person", "Skill", "Level", "Certificate"],
+    [t("field.validTo"), t("expiry.ends"), t("field.person"), t("field.skill"), t("field.level"), t("field.certificate")],
     ...rows.map((assignment) => [
       formatDate(assignment.endDate!),
-      dueText(daysUntil(assignment.endDate!, today)),
+      due(assignment),
       person(assignment)!.displayName,
       skill(assignment)!.name,
       assignment.levelName ?? "",
-      hasCertificate(assignment) ? "yes" : "no",
+      t(hasCertificate(assignment) ? "common.yes" : "common.no"),
     ]),
   ];
 
@@ -82,20 +88,20 @@ export function ExpiryList() {
     <div className={shell.panel}>
       <Bar
         design="Header"
-        startContent={<Title level="H3">Expiring assignments ({rows.length})</Title>}
+        startContent={<Title level="H3">{t("expiry.title", { count: rows.length })}</Title>}
         endContent={
           <span className={styles.actions}>
-            <Label for="expiry-window">Next</Label>
+            <Label for="expiry-window">{t("expiry.next")}</Label>
             <Select id="expiry-window" onChange={(event) => setDays(Number(event.detail.selectedOption.dataset.days))}>
               {WINDOWS.map((window) => (
                 <Option key={window} data-days={window} selected={window === days}>
-                  {window} days
+                  {t("expiry.days", { count: window })}
                 </Option>
               ))}
             </Select>
             {rows.length > 0 && <ExportButton name="expiring-assignments" getRows={exportRows} onError={showToast} />}
-            <Button icon="refresh" tooltip="Load the current data from SAP FSM" disabled={loading} onClick={reload}>
-              Refresh
+            <Button icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
+              {t("action.refresh")}
             </Button>
           </span>
         }
@@ -105,8 +111,8 @@ export function ExpiryList() {
       <div className={styles.filters}>
         <Input
           className={styles.search}
-          placeholder="Search person"
-          accessibleName="Search person"
+          placeholder={t("filter.searchPerson")}
+          accessibleName={t("filter.searchPerson")}
           showClearIcon
           icon={<Icon name="search" />}
           value={search}
@@ -114,8 +120,8 @@ export function ExpiryList() {
         />
         <MultiComboBox
           className={styles.skills}
-          placeholder="Filter by skills"
-          accessibleName="Filter by skills"
+          placeholder={t("filter.bySkills")}
+          accessibleName={t("filter.bySkills")}
           onSelectionChange={(event) => setSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
         >
           {data.skills.map((s) => (
@@ -125,8 +131,8 @@ export function ExpiryList() {
         {levelNames.length > 0 && (
           <MultiComboBox
             className={styles.levels}
-            placeholder="Filter by level"
-            accessibleName="Filter by level"
+            placeholder={t("filter.byLevel")}
+            accessibleName={t("filter.byLevel")}
             onSelectionChange={(event) => setLevels(event.detail.items.map((item) => item.text ?? ""))}
           >
             {levelNames.map((name) => (
@@ -135,39 +141,35 @@ export function ExpiryList() {
           </MultiComboBox>
         )}
         <Button
-          tooltip="Only assignments that have no certificate attached"
+          tooltip={t("expiry.noCertificateHelp")}
           design={noCertificate ? "Emphasized" : "Default"}
           icon={noCertificate ? "accept" : undefined}
-          accessibleName={`No certificate, ${noCertificate ? "filter on" : "filter off"}`}
+          accessibleName={t(noCertificate ? "filter.on" : "filter.off", { label: t("filter.noCertificate") })}
           onClick={() => setNoCertificate(!noCertificate)}
         >
-          No certificate
+          {t("filter.noCertificate")}
         </Button>
       </div>
 
       {rows.length === 0 ? (
-        <IllustratedMessage
-          name="NoEntries"
-          titleText="Nothing expires soon"
-          subtitleText={`No assignment that matches the filters ends in the next ${days} days.`}
-        />
+        <IllustratedMessage name="NoEntries" titleText={t("expiry.emptyTitle")} subtitleText={t("expiry.emptyText", { count: days })} />
       ) : (
         <Table
           loading={loading}
-          accessibleName="Expiring assignments"
+          accessibleName={t("expiry.tableName")}
           overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
-              <TableHeaderCell width="8rem">Valid to</TableHeaderCell>
-              <TableHeaderCell width="8rem">Ends</TableHeaderCell>
-              <TableHeaderCell minWidth="12rem">Person</TableHeaderCell>
-              <TableHeaderCell minWidth="12rem">Skill</TableHeaderCell>
-              <TableHeaderCell width="8rem">Level</TableHeaderCell>
+              <TableHeaderCell width="8rem">{t("field.validTo")}</TableHeaderCell>
+              <TableHeaderCell width="8rem">{t("expiry.ends")}</TableHeaderCell>
+              <TableHeaderCell minWidth="12rem">{t("field.person")}</TableHeaderCell>
+              <TableHeaderCell minWidth="12rem">{t("field.skill")}</TableHeaderCell>
+              <TableHeaderCell width="8rem">{t("field.level")}</TableHeaderCell>
               <TableHeaderCell width="7rem" horizontalAlign="Center">
-                Certificate
+                {t("field.certificate")}
               </TableHeaderCell>
               <TableHeaderCell width="6rem" horizontalAlign="End">
-                Actions
+                {t("field.actions")}
               </TableHeaderCell>
             </TableHeaderRow>
           }
@@ -178,7 +180,7 @@ export function ExpiryList() {
                 <Text>{formatDate(assignment.endDate!)}</Text>
               </TableCell>
               <TableCell>
-                <Text>{dueText(daysUntil(assignment.endDate!, today))}</Text>
+                <Text>{due(assignment)}</Text>
               </TableCell>
               <TableCell>
                 <Text>{person(assignment)!.displayName}</Text>
@@ -190,14 +192,14 @@ export function ExpiryList() {
                 <Text>{assignment.levelName ?? ""}</Text>
               </TableCell>
               <TableCell horizontalAlign="Center">
-                {hasCertificate(assignment) && <Icon name="attachment" accessibleName="Has certificate" showTooltip />}
+                {hasCertificate(assignment) && <Icon name="attachment" accessibleName={t("cell.hasCertificate")} showTooltip />}
               </TableCell>
               <TableCell horizontalAlign="End">
                 <Button
                   design="Transparent"
                   icon="edit"
-                  accessibleName={`Edit ${skill(assignment)!.name} of ${person(assignment)!.displayName}`}
-                  tooltip="Edit or renew"
+                  accessibleName={t("expiry.editLabel", { skill: skill(assignment)!.name, person: person(assignment)!.displayName })}
+                  tooltip={t("expiry.editTooltip")}
                   onClick={() => setSelected({ assignment, person: person(assignment)!, skill: skill(assignment)! })}
                 />
               </TableCell>

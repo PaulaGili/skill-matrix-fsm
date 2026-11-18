@@ -88,7 +88,40 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
 - The key stays on the server, like the FSM secret, and the bundle check covers it. The file is only sent when the user clicks the button, and there is a cap on reads per hour.
 - The answer is requested as structured output, so its shape is guaranteed by the API and not parsed from free text.
-- `npm run eval:ai` reads five invented certificates (English, German, an image, one without dates and one with an instruction hidden in the text) and compares the answers with the known ones. It calls the real service, so it is run by hand and not in CI.
+- `npm run eval:ai` reads five invented certificates (English, German, an image, one without dates and one with an instruction hidden in the text) and compares the answers with the known ones. It calls the real service, so it is run by hand and not in CI. Last run: 15 of 15 fields correct, about 2 seconds per file. Five clean files do not show how it copes with a poor scan.
+
+## Asking the matrix a question
+
+- With the AI key set, the matrix has an "Ask" field: "who can do Welding and First Aid?" sets the skill, status and level filters.
+- The AI turns the question into filter values and nothing else. It does not answer and it never sees persons or assignments: only the question and the names of skills and levels are sent. A browser test checks the request.
+- The code keeps only names and statuses that exist, tells the user what was left out, and the matrix computes the result with the same tested filter rules as a manual filter. A wrong answer from the AI can therefore only produce a wrong filter, which is visible and can be changed by hand.
+- A question about a skill that does not exist sets no filter at all and says which name was not found. The first version left the unknown skill out and kept the rest, so "who is certified for diving?" showed everyone with any valid skill. The evaluation found that.
+- `npm run eval:ai` also runs six questions with known filters, including German, a skill that does not exist and an instruction hidden in the question. The same question can get a different answer the next time, so `npm run eval:ai -- 3` asks each one three times and only counts it when all three match. Last run: 6 of 6 questions correct in all three runs. Before the fix above it was 4 of 6.
+
+## Demo mode
+
+- `NEXT_PUBLIC_DEMO_MODE=1` runs the app on invented sample data, read-only. The FSM credentials of the assessment are revoked after the deadline, and the app should still be showable.
+- It is a second small route, `/api/demo`, that answers the same read calls as the FSM proxy. The app only changes the base URL, so every screen runs the same code as with FSM. Writes are refused with a clear message, and a banner says that the data is not real.
+- The dates of the sample data are relative to today, so every status is always present.
+
+## Languages
+
+- The app is in English and German, with an EN / DE switch in the shell bar. The first visit follows the browser: German when its language starts with `de`, otherwise English. The choice is remembered in `localStorage`.
+- The texts are two plain objects, `src/lib/i18n/en.ts` and `de.ts`. The English one defines the keys and the German one is typed against it, so a missing key does not compile. One `translate` function fills `{name}` placeholders and chooses between `one` and `other` by a `count` parameter, which is all the plural handling these two languages need. A unit test checks that both files have the same keys and placeholders.
+- No library: `next-intl` or `i18next` bring routing by locale, message formats and loaders that an app with two languages and about 220 texts does not use, and the assessment should stay explainable line by line. If a third language with other plural rules were added, `Intl.PluralRules` would replace the `count === 1` check.
+- The pure rules in `src/lib/domain` return a message key with parameters instead of a sentence (`{ key: "hint.until", params: { date } }`), and the UI translates it. They stay free of React and their tests do not depend on wording. The one exception is the export table, which builds finished cell texts and therefore receives the translate function.
+- Errors from the services are `UserError` objects with the same key and parameters. Their own `message` is the English text, so scripts and logs stay readable, and `toUserMessage` translates them for the screen.
+- The pages are prerendered in English. The provider reads the language with `useSyncExternalStore` and an English server snapshot, so the first browser render matches the HTML and React switches to German right after. A German user sees the English shell for a moment on a cold load; avoiding that would need a cookie and server rendering per request.
+- The built-in texts of the UI5 components (calendar, table, tooltips) follow the same switch through UI5's own `setLanguage`.
+- German is written for Switzerland: `ss` instead of the sharp s, formal address, SAP wording. Dates are `dd.MM.yyyy` in both languages.
+- Not translated: names of skills, persons, levels and job titles, because they are data from FSM; the texts FSM itself returns, which are shown inside "FSM error (status): ..."; the placeholder name "(no name)" of a technical person without a name, which is part of the name the search and the sort order use; and the texts of the server routes. For the AI routes the UI shows its own translated text by HTTP status, and for demo mode it translates the read-only refusal.
+
+## MCP server
+
+- `npm run mcp` starts a small MCP server, so an AI assistant can answer questions about the matrix: which skills exist, who holds one, what a person has, what expires soon.
+- Read-only by design: it has four tools and none of them writes. It reads through the app's proxy like the other scripts, so it needs no credentials of its own.
+- The answers are built by pure functions on top of the same rules as the app (status, expiry window, which assignment counts), with unit tests. The assistant gets facts and does not calculate a status itself.
+- Unlike the two AI features in the app, this one does hand person data to the assistant that is connected. That is the purpose, and the user chooses which assistant to connect.
 
 ## Tooling
 
@@ -96,4 +129,5 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - Unit tests (Vitest) cover the pure rules: statuses, dates, file checks, namespace checks and the mapping of FSM responses.
 - Browser tests (Playwright) run against the production build with FSM mocked in the browser, so CI needs no credentials and never writes to the shared company. One of them checks that the matrix loads with four FSM calls.
 - `npm run smoke` exercises the service layer against the real company and deletes what it created.
+- Two review agents live in `.claude/agents`: a code reviewer and an evaluator that scores the repository against the assignment. Both are read-only. Their findings were checked against the code before anything was changed.
 - `npm run seed` creates 5 skills, 10 assignments and 4 sample certificates with dates relative to today, and skips what already exists. `npm run cleanup` only lists unless called with `-- --yes`.

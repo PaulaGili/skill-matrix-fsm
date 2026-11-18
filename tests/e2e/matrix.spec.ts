@@ -102,3 +102,62 @@ test("the expiry page lists what ends soon, soonest first", async ({ page }) => 
   await expect(page.getByText("Conti, Carla")).toBeHidden();
   expect(calls).toHaveLength(4);
 });
+
+test("a question in plain words sets the filters", async ({ page }) => {
+  await mockFsm(page);
+  let sent: unknown;
+  await page.route("**/api/ai/certificate", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/ai/question", (route) => {
+    sent = route.request().postDataJSON();
+    const diving = String(route.request().postDataJSON().question).includes("diving");
+    const answer = { understood: true, personSearch: null, skills: ["Welding"], statuses: [], levels: [], unknown: [] as string[] };
+    return route.fulfill({ json: diving ? { ...answer, skills: [], statuses: ["valid", "expiring"], unknown: ["Diving"] } : answer });
+  });
+  await page.goto("/");
+  const ask = async (question: string) => {
+    await page.getByRole("textbox", { name: "Ask a question about the matrix" }).fill(question);
+    await page.getByRole("button", { name: "Ask", exact: true }).click();
+  };
+
+  await ask("who can weld?");
+  await expect(page.getByText("Understood as: skill Welding, status Valid or Expiring soon.")).toBeVisible();
+  await expect(page.getByText("Persons (2)")).toBeVisible();
+  // Only the question and the names of skills and levels are sent, no persons.
+  expect(sent).toEqual({ question: "who can weld?", skills: ["First Aid", "Welding"], levels: ["Basic", "Expert"] });
+
+  // A skill that does not exist changes no filter.
+  await ask("who is certified for diving?");
+  await expect(page.getByText("There is no skill or level called Diving, so no filter was set.")).toBeVisible();
+  await expect(page.getByText("Persons (2)")).toBeVisible();
+});
+
+test("the language switch shows the app in German and remembers the choice", async ({ page }) => {
+  await mockFsm(page);
+  await page.goto("/");
+  await expect(page.getByText("Persons (3)")).toBeVisible();
+
+  await page.getByText("DE", { exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "Qualifikationsmatrix" })).toBeVisible();
+  await expect(page.getByText("Personen (3)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Baumann, Beat, Welding: Läuft bald ab. Bearbeiten" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Abgelaufen, Filter aus" })).toBeVisible();
+  await expect(page).toHaveTitle("Qualifikationsverwaltung");
+
+  await page.getByRole("button", { name: "Baumann, Beat, First Aid: nicht zugewiesen. Zuweisen" }).click();
+  await expect(page.getByText("Gültig ab", { exact: true })).toBeVisible();
+  await expect(page.getByText("Zertifikate (0)")).toBeVisible();
+  const from = page.locator("#valid-from input");
+  const to = page.locator("#valid-to input");
+  await from.fill("01.01.2026");
+  await from.press("Tab");
+  await to.fill("31.12.2025");
+  await to.press("Tab");
+  await expect(page.getByRole("alert")).toHaveText("Gültig bis darf nicht vor Gültig ab liegen.");
+  await expect(page.getByRole("button", { name: "Zuweisen", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+
+  // The choice is stored, so it wins over the English browser language after a reload.
+  await page.reload();
+  await expect(page.getByText("Personen (3)")).toBeVisible();
+});

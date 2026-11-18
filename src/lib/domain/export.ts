@@ -1,24 +1,27 @@
+import type { Translate } from "@/lib/i18n/translate";
 import { cellKey, cellPasses, type Cell, type MatrixFilters } from "./matrix";
-import { validityHint, type AssignmentStatus, type Validity } from "./status";
+import { validityHint, type Validity } from "./status";
 
 type ExportCell = Cell<Validity & { id: string; personId: string; skillId: string; levelName: string | null }>;
 
 // The matrix as it is shown: one row per person, one column per skill. Cells that are not
-// assigned or hidden by a filter are empty.
+// assigned or hidden by a filter are empty. It builds finished texts, so it gets the
+// translate function instead of returning messages.
 export function matrixTable(
   persons: { id: string; displayName: string }[],
   skills: { id: string; name: string }[],
   cells: Map<string, ExportCell>,
   filters: MatrixFilters,
-  statusText: (status: AssignmentStatus) => string,
+  t: Translate,
 ): string[][] {
   const text = (cell: ExportCell | undefined) => {
     if (!cell || !cellPasses(cell, filters)) return "";
-    const parts = [statusText(cell.status), cell.assignment.levelName, validityHint(cell.assignment, cell.status), cell.hasCertificate ? "certificate" : ""];
+    const hint = validityHint(cell.assignment, cell.status);
+    const parts = [t(`status.${cell.status}`), cell.assignment.levelName, t(hint.key, hint.params), cell.hasCertificate ? t("export.certificate") : ""];
     return parts.filter(Boolean).join(", ");
   };
   return [
-    ["Person", ...skills.map((skill) => skill.name)],
+    [t("field.person"), ...skills.map((skill) => skill.name)],
     ...persons.map((person) => [person.displayName, ...skills.map((skill) => text(cells.get(cellKey(person.id, skill.id))))]),
   ];
 }

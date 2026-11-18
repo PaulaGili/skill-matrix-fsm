@@ -6,6 +6,8 @@ import { useAsyncData } from "@/hooks/useAsyncData";
 import { validateValidity } from "@/lib/domain/status";
 import type { AssignmentInput } from "@/lib/fsm/services/assignments";
 import { listLevels } from "@/lib/fsm/services/scale";
+import { useI18n } from "@/lib/i18n/I18nProvider";
+import type { Message } from "@/lib/i18n/translate";
 import styles from "./AssignmentDialog.module.css";
 
 // The form keeps empty dates as "", which is what the date picker works with.
@@ -15,7 +17,7 @@ export interface FieldValues {
   endDate: string;
 }
 
-export function fieldsError(value: FieldValues): string | null {
+export function fieldsError(value: FieldValues): Message | null {
   return validateValidity(value.startDate || null, value.endDate || null);
 }
 
@@ -34,6 +36,7 @@ interface Props {
 export function LevelField({ scaleId, value, disabled, onChange }: Props) {
   const loadLevels = useCallback(() => (scaleId ? listLevels(scaleId) : Promise.resolve([])), [scaleId]);
   const levels = useAsyncData(loadLevels);
+  const { t } = useI18n();
 
   return (
     <>
@@ -42,14 +45,14 @@ export function LevelField({ scaleId, value, disabled, onChange }: Props) {
           {levels.error}
         </MessageStrip>
       )}
-      <Label for="assignment-level">Level</Label>
+      <Label for="assignment-level">{t("field.level")}</Label>
       <Select
         id="assignment-level"
         disabled={disabled || levels.loading}
         onChange={(event) => onChange({ ...value, levelId: event.detail.selectedOption.dataset.id || null })}
       >
         <Option data-id="" selected={value.levelId === null}>
-          No level
+          {t("field.noLevel")}
         </Option>
         {(levels.data ?? []).map((level) => (
           <Option key={level.id} data-id={level.id} selected={level.id === value.levelId}>
@@ -63,21 +66,23 @@ export function LevelField({ scaleId, value, disabled, onChange }: Props) {
 
 // Valid from and valid to. `idPrefix` keeps the field ids unique when the fields are shown per person.
 export function ValidityFields({ value, disabled, onChange, idPrefix = "valid" }: Omit<Props, "scaleId"> & { idPrefix?: string }) {
-  const dateError = fieldsError(value);
-  const startError = dateError?.startsWith("Valid from") ? dateError : null;
+  const { t } = useI18n();
+  const error = fieldsError(value);
+  const dateError = error ? t(error.key, error.params) : null;
+  const startError = error?.key === "validity.fromInvalid" ? dateError : null;
   const endError = startError ? null : dateError;
 
   return (
     <>
       <div className={styles.dates}>
         <div>
-          <Label for={`${idPrefix}-from`}>Valid from</Label>
+          <Label for={`${idPrefix}-from`}>{t("field.validFrom")}</Label>
           <DatePicker
             id={`${idPrefix}-from`}
             value={value.startDate}
             valueFormat="yyyy-MM-dd"
             displayFormat="dd.MM.yyyy"
-            placeholder="Today if empty"
+            placeholder={t("field.todayIfEmpty")}
             showClearIcon
             disabled={disabled}
             valueState={startError ? "Negative" : "None"}
@@ -86,13 +91,13 @@ export function ValidityFields({ value, disabled, onChange, idPrefix = "valid" }
           />
         </div>
         <div>
-          <Label for={`${idPrefix}-to`}>Valid to</Label>
+          <Label for={`${idPrefix}-to`}>{t("field.validTo")}</Label>
           <DatePicker
             id={`${idPrefix}-to`}
             value={value.endDate}
             valueFormat="yyyy-MM-dd"
             displayFormat="dd.MM.yyyy"
-            placeholder="No end date"
+            placeholder={t("field.noEndDate")}
             showClearIcon
             disabled={disabled}
             valueState={endError ? "Negative" : "None"}

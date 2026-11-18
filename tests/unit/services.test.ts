@@ -22,9 +22,9 @@ describe("assertOwnName", () => {
 describe("skillNameError", () => {
   it("requires a name without the namespace separator", () => {
     expect(skillNameError("  Welding ")).toBeNull();
-    expect(skillNameError("   ")).toMatch(/required/);
-    expect(skillNameError("a::b")).toMatch(/::/);
-    expect(skillNameError("x".repeat(600))).toMatch(/too long/);
+    expect(skillNameError("   ")).toEqual({ key: "skill.nameRequired" });
+    expect(skillNameError("a::b")).toEqual({ key: "skill.nameSeparator" });
+    expect(skillNameError("x".repeat(600))).toEqual({ key: "skill.nameTooLong" });
   });
 });
 

@@ -56,11 +56,11 @@ describe("formatDate", () => {
 
 describe("validityHint", () => {
   it("shows the date that matters for the status", () => {
-    expect(validityHint({ startDate: "2026-01-01", endDate: "2026-11-29" }, "expiring")).toBe("until 29.11.2026");
-    expect(validityHint({ startDate: "2026-01-01", endDate: "2027-06-30" }, "valid")).toBe("until 30.06.2027");
-    expect(validityHint({ startDate: "2026-01-01", endDate: null }, "valid")).toBe("no end date");
-    expect(validityHint({ startDate: "2025-01-01", endDate: "2026-10-27" }, "expired")).toBe("ended 27.10.2026");
-    expect(validityHint({ startDate: "2026-12-02", endDate: null }, "notYetValid")).toBe("from 02.12.2026");
+    expect(validityHint({ startDate: "2026-01-01", endDate: "2026-11-29" }, "expiring")).toEqual({ key: "hint.until", params: { date: "29.11.2026" } });
+    expect(validityHint({ startDate: "2026-01-01", endDate: "2027-06-30" }, "valid")).toEqual({ key: "hint.until", params: { date: "30.06.2027" } });
+    expect(validityHint({ startDate: "2026-01-01", endDate: null }, "valid")).toEqual({ key: "hint.noEnd" });
+    expect(validityHint({ startDate: "2025-01-01", endDate: "2026-10-27" }, "expired")).toEqual({ key: "hint.ended", params: { date: "27.10.2026" } });
+    expect(validityHint({ startDate: "2026-12-02", endDate: null }, "notYetValid")).toEqual({ key: "hint.from", params: { date: "02.12.2026" } });
   });
 });
 
@@ -81,17 +81,17 @@ describe("validateValidity", () => {
   });
 
   it("rejects an end date before the start date", () => {
-    expect(validateValidity("2026-02-01", "2026-01-31")).toMatch(/must not be before/);
+    expect(validateValidity("2026-02-01", "2026-01-31")).toEqual({ key: "validity.toBeforeFrom" });
   });
 
   it("rejects an end date in the past when the start is empty, because empty means today", () => {
-    expect(validateValidity(null, "2026-11-10", "2026-11-17")).toMatch(/in the past/);
+    expect(validateValidity(null, "2026-11-10", "2026-11-17")).toEqual({ key: "validity.toInPast" });
     expect(validateValidity(null, "2026-11-17", "2026-11-17")).toBeNull();
     expect(validateValidity("2026-01-01", "2026-11-10", "2026-11-17")).toBeNull();
   });
 
   it("rejects malformed dates", () => {
-    expect(validateValidity("2026-13-01", null)).toMatch(/Valid from/);
-    expect(validateValidity(null, "tomorrow")).toMatch(/Valid to/);
+    expect(validateValidity("2026-13-01", null)).toEqual({ key: "validity.fromInvalid" });
+    expect(validateValidity(null, "tomorrow")).toEqual({ key: "validity.toInvalid" });
   });
 });

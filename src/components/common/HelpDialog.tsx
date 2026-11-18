@@ -2,52 +2,55 @@
 
 import { Bar, Button, Dialog, Icon, Text, Title } from "@ui5/webcomponents-react";
 import type { AssignmentStatus } from "@/lib/domain/status";
-import { STATUS_HELP, StatusBadge } from "./StatusBadge";
+import { useI18n } from "@/lib/i18n/I18nProvider";
+import { StatusBadge } from "./StatusBadge";
 import styles from "./HelpDialog.module.css";
 
 const STATUSES: AssignmentStatus[] = ["valid", "expiring", "expired", "notYetValid", "unassigned"];
 
 export function HelpDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   return (
-    <Dialog open headerText="Help" onClose={onClose} footer={<Bar design="Footer" endContent={<Button onClick={onClose}>Close</Button>} />}>
+    <Dialog
+      open
+      headerText={t("shell.help")}
+      onClose={onClose}
+      footer={<Bar design="Footer" endContent={<Button onClick={onClose}>{t("action.close")}</Button>} />}
+    >
       <div className={styles.help}>
-        <Title level="H5">Statuses</Title>
+        <Title level="H5">{t("help.statuses")}</Title>
         <dl className={styles.statuses}>
           {STATUSES.map((status) => (
             <div key={status}>
               <dt>
                 <StatusBadge status={status} />
               </dt>
-              <dd>{STATUS_HELP[status]}</dd>
+              <dd>{t(`statusHelp.${status}`)}</dd>
             </div>
           ))}
           <div>
             <dt>
-              <Icon name="attachment" /> Certificate
+              <Icon name="attachment" /> {t("field.certificate")}
             </dt>
-            <dd>At least one certificate file is attached to the assignment.</dd>
+            <dd>{t("help.certificateText")}</dd>
           </div>
         </dl>
 
-        <Title level="H5">Skill matrix</Title>
-        <Text>Each row is a person and each column a skill. Click a cell to assign the skill or to change its level, validity and certificates.</Text>
-        <Text>
-          Select skills in the filter to see who holds all of them today: Valid and Expiring soon are switched on for you and can be changed. The Show only
-          buttons filter by status: several statuses are alternatives, and No certificate adds a condition. With skills selected, the status applies to those
-          skills, so Welding and Expired shows whose welding has expired. The level filter works the same way. With a filter on, only the matching assignments
-          are shown; the rest of the row is left blank and skills without a match are hidden. Click a button again to switch it off.
-        </Text>
-        <Text>System users are the login accounts of the same persons. They are hidden unless you switch them on.</Text>
-        <Text>Assign to several gives one skill to up to 20 persons at once, with the same level and the same or separate dates.</Text>
+        <Title level="H5">{t("nav.matrix")}</Title>
+        <Text>{t("help.matrixCells")}</Text>
+        <Text>{t("help.matrixFilters")}</Text>
+        <Text>{t("help.systemUsers")}</Text>
+        <Text>{t("help.ask")}</Text>
+        <Text>{t("help.assignSeveral")}</Text>
 
-        <Title level="H5">Skill catalogue</Title>
-        <Text>
-          Create, rename and delete skills. A skill that is still assigned can be retired, which ends its valid assignments and keeps the history and
-          certificates; assignments that start after today are removed. Or it can be deleted together with everything attached to it.
-        </Text>
+        <Title level="H5">{t("nav.catalog")}</Title>
+        <Text>{t("help.catalogText")}</Text>
 
-        <Title level="H5">Expiring</Title>
-        <Text>Every assignment that ends within the next 30, 60, 90 or 180 days, soonest first. Edit a row to renew it or to add the new certificate.</Text>
+        <Title level="H5">{t("nav.expiry")}</Title>
+        <Text>{t("help.expiryText")}</Text>
+
+        <Title level="H5">{t("shell.language")}</Title>
+        <Text>{t("help.languageText")}</Text>
       </div>
     </Dialog>
   );

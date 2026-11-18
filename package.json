@@ -19,6 +19,7 @@
     "e2e": "playwright test",
     "gate": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build && node scripts/ci/check-bundle.mjs && npm run e2e",
     "check:fsm": "node --env-file=.env.local scripts/check-connection.mjs",
+    "mcp": "tsx --env-file=.env.local mcp/server.ts",
     "eval:ai": "tsx --env-file=.env.local tests/ai-eval/run.ts",
     "smoke": "tsx --env-file=.env.local tests/fsm-smoke.ts",
     "seed": "tsx --env-file=.env.local scripts/fsm/seed.ts",
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@ui5/webcomponents": "2.27.2",
     "@ui5/webcomponents-base": "2.27.2",
     "@ui5/webcomponents-fiori": "2.27.2",

@@ -30,8 +30,8 @@ describe("daysUntil and dueText", () => {
   });
 
   it("words the due date", () => {
-    expect(dueText(0)).toBe("today");
-    expect(dueText(1)).toBe("tomorrow");
-    expect(dueText(14)).toBe("in 14 days");
+    expect(dueText(0)).toEqual({ key: "due.today" });
+    expect(dueText(1)).toEqual({ key: "due.tomorrow" });
+    expect(dueText(14)).toEqual({ key: "due.inDays", params: { count: 14 } });
   });
 });

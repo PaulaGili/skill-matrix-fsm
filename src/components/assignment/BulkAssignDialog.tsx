@@ -5,6 +5,7 @@ import { Bar, Button, Dialog, Label, MessageStrip, MultiComboBox, MultiComboBoxI
 import { toUserMessage } from "@/lib/fsm/errors";
 import { MAX_BULK_ASSIGNMENTS, createAssignments } from "@/lib/fsm/services/assignments";
 import type { Person, Skill } from "@/lib/fsm/services/model";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LevelField, ValidityFields, fieldsError, toInput, type FieldValues } from "./AssignmentFields";
 import styles from "./AssignmentDialog.module.css";
 
@@ -27,6 +28,7 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
   const [ownDates, setOwnDates] = useState<Record<string, FieldValues>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { t } = useI18n();
 
   const skill = skills.find((s) => s.id === skillId)!;
   const candidates = persons.filter((person) => !isAssigned(person.id, skillId));
@@ -45,9 +47,9 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
         skillId,
         personIds.map((personId) => ({ ...toInput(valuesOf(personId)), personId })),
       );
-      onSaved(`${skill.name} assigned to ${personIds.length} ${personIds.length === 1 ? "person" : "persons"}.`);
+      onSaved(t("bulk.assigned", { skill: skill.name, count: personIds.length }));
     } catch (e) {
-      setError(toUserMessage(e));
+      setError(toUserMessage(e, t));
       setBusy(false);
       onChanged();
     }
@@ -56,7 +58,7 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
   return (
     <Dialog
       open
-      headerText="Assign a skill to several persons"
+      headerText={t("bulk.title")}
       onBeforeClose={(event) => busy && event.preventDefault()}
       onClose={onClose}
       footer={
@@ -65,10 +67,10 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
           endContent={
             <>
               <Button design="Emphasized" disabled={busy || personIds.length === 0 || tooMany || invalid} onClick={assign}>
-                Assign to {personIds.length} {personIds.length === 1 ? "person" : "persons"}
+                {t("bulk.assignTo", { count: personIds.length })}
               </Button>
               <Button design="Transparent" disabled={busy} onClick={onClose}>
-                Cancel
+                {t("action.cancel")}
               </Button>
             </>
           }
@@ -83,11 +85,11 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
         )}
         {tooMany && (
           <MessageStrip design="Critical" hideCloseButton>
-            Select at most {MAX_BULK_ASSIGNMENTS} persons at once.
+            {t("bulk.tooMany", { max: MAX_BULK_ASSIGNMENTS })}
           </MessageStrip>
         )}
 
-        <Label for="bulk-skill">Skill</Label>
+        <Label for="bulk-skill">{t("field.skill")}</Label>
         <Select
           id="bulk-skill"
           disabled={busy}
@@ -104,11 +106,11 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
           ))}
         </Select>
 
-        <Label for="bulk-persons">Persons without this skill ({candidates.length})</Label>
+        <Label for="bulk-persons">{t("bulk.candidates", { count: candidates.length })}</Label>
         <MultiComboBox
           key={skillId}
           id="bulk-persons"
-          placeholder="Select persons"
+          placeholder={t("bulk.selectPersons")}
           showSelectAll
           disabled={busy}
           onSelectionChange={(event) => setPersonIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
@@ -129,7 +131,7 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
             onChange={(event) => setSameDates(event.target.checked)}
           />
           <Label id="same-dates-label" for="same-dates" onClick={() => busy || setSameDates(!sameDates)}>
-            Same validity for everyone
+            {t("bulk.sameValidity")}
           </Label>
         </span>
         {sameDates ? (

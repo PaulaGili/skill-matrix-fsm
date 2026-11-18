@@ -73,7 +73,7 @@ run(async () => {
       uploads: [file, { ...file, fileName: "notes.txt" }, { ...file, fileName: "to-delete.pdf" }],
     });
     assert.equal(failures.length, 1);
-    assert.match(failures[0].message, /notes\.txt/);
+    assert.equal(failures[0].fileName, "notes.txt");
     assert.equal(failures[0].index, 1);
     const uploaded = (await listCertificates()).filter((c) => c.assignmentId === first.id);
     assert.deepEqual(uploaded.map((c) => c.fileName).sort(), ["smoke-test.pdf", "to-delete.pdf"]);

@@ -1,6 +1,8 @@
 // Assignment status and validity dates. Dates are "yyyy-MM-dd" strings, as FSM stores them,
 // and are compared as text: new Date("2026-11-17") is midnight UTC and can shift the day.
 
+import type { Message } from "@/lib/i18n/translate";
+
 export const OPEN_END_DATE = "9999-12-31"; // how the Skill Service returns "no end date"
 export const EXPIRY_WINDOW_DAYS = 30;
 export const TIME_ZONE = "Europe/Zurich";
@@ -45,18 +47,19 @@ export function assignmentStatus(assignment: Validity | null | undefined, today:
   return "valid";
 }
 
-export function validityHint(validity: Validity, status: AssignmentStatus): string {
-  if (status === "notYetValid" && validity.startDate) return `from ${formatDate(validity.startDate)}`;
-  if (!validity.endDate) return "no end date";
-  return status === "expired" ? `ended ${formatDate(validity.endDate)}` : `until ${formatDate(validity.endDate)}`;
+// The date that matters for a cell, e.g. "until 29.11.2026", as a message to translate.
+export function validityHint(validity: Validity, status: AssignmentStatus): Message {
+  if (status === "notYetValid" && validity.startDate) return { key: "hint.from", params: { date: formatDate(validity.startDate) } };
+  if (!validity.endDate) return { key: "hint.noEnd" };
+  return { key: status === "expired" ? "hint.ended" : "hint.until", params: { date: formatDate(validity.endDate) } };
 }
 
 // Returns a message for the user, or null when the dates are fine. Both dates are optional.
 // An empty "valid from" is saved as today, so "valid to" cannot be in the past then.
-export function validateValidity(startDate: string | null, endDate: string | null, today = todayIso()): string | null {
-  if (startDate && !isIsoDate(startDate)) return "Valid from is not a valid date.";
-  if (endDate && !isIsoDate(endDate)) return "Valid to is not a valid date.";
-  if (!startDate && endDate && endDate < today) return "Valid to is in the past. Enter the valid from date as well.";
-  if (startDate && endDate && endDate < startDate) return "Valid to must not be before valid from.";
+export function validateValidity(startDate: string | null, endDate: string | null, today = todayIso()): Message | null {
+  if (startDate && !isIsoDate(startDate)) return { key: "validity.fromInvalid" };
+  if (endDate && !isIsoDate(endDate)) return { key: "validity.toInvalid" };
+  if (!startDate && endDate && endDate < today) return { key: "validity.toInPast" };
+  if (startDate && endDate && endDate < startDate) return { key: "validity.toBeforeFrom" };
   return null;
 }

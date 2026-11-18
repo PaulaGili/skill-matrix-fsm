@@ -17,9 +17,9 @@ import { BulkAssignDialog } from "@/components/assignment/BulkAssignDialog";
 import shell from "@/components/common/AppShell.module.css";
 import { ExportButton } from "@/components/common/ExportDialog";
 import { LoadError, Loading } from "@/components/common/LoadState";
-import { STATUS_LABELS } from "@/components/common/StatusBadge";
 import { useToast } from "@/components/common/useToast";
 import { useAsyncData } from "@/hooks/useAsyncData";
+import { isAiEnabled } from "@/lib/ai/client";
 import {
   HELD_TODAY,
   buildCells,
@@ -35,6 +35,8 @@ import { matrixTable } from "@/lib/domain/export";
 import { todayIso } from "@/lib/domain/status";
 import { loadMatrixData } from "@/lib/fsm/services/matrix";
 import type { Person, Skill } from "@/lib/fsm/services/model";
+import { useI18n } from "@/lib/i18n/I18nProvider";
+import { AskMatrix } from "./AskMatrix";
 import { MatrixCell } from "./MatrixCell";
 import { MatrixFilters } from "./MatrixFilters";
 import styles from "./SkillMatrix.module.css";
@@ -57,6 +59,8 @@ export function SkillMatrix() {
   const [selected, setSelected] = useState<{ person: Person; skill: Skill } | null>(null);
   const [assigningSeveral, setAssigningSeveral] = useState(false);
   const { toastElement, showToast } = useToast();
+  const aiEnabled = useAsyncData(isAiEnabled).data === true;
+  const { t } = useI18n();
   const today = todayIso();
 
   // Selecting the first skill switches on Valid and Expiring soon: "who can do this today?".
@@ -99,7 +103,7 @@ export function SkillMatrix() {
   const columns = useMemo<AnalyticalTableColumnDefinition[]>(
     () => [
       {
-        Header: "Person",
+        Header: t("field.person"),
         id: "person",
         sticky: "start",
         disableSticky: true,
@@ -110,7 +114,7 @@ export function SkillMatrix() {
           return (
             <span className={styles.person}>
               <span>{person.displayName}</span>
-              <span className={styles.detail}>{person.isTechnician ? person.jobTitle : "System user"}</span>
+              <span className={styles.detail}>{person.isTechnician ? person.jobTitle : t("matrix.systemUser")}</span>
             </span>
           );
         },
@@ -135,7 +139,7 @@ export function SkillMatrix() {
         },
       })),
     ],
-    [skills, cells, filters],
+    [skills, cells, filters, t],
   );
 
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
@@ -145,37 +149,39 @@ export function SkillMatrix() {
   return (
     <>
       <div className={styles.header}>
-        <Title level="H2">Skill matrix</Title>
+        <Title level="H2">{t("nav.matrix")}</Title>
         <span className={styles.inline}>
+          {data.skills.length > 0 && <ExportButton name="skill-matrix" getRows={() => matrixTable(persons, skills, cells, filters, t)} onError={showToast} />}
           {data.skills.length > 0 && (
-            <ExportButton
-              name="skill-matrix"
-              getRows={() => matrixTable(persons, skills, cells, filters, (status) => STATUS_LABELS[status].text)}
-              onError={showToast}
-            />
-          )}
-          {data.skills.length > 0 && (
-            <Button icon="add-employee" tooltip="Assign one skill to several persons at once" onClick={() => setAssigningSeveral(true)}>
-              Assign to several
+            <Button icon="add-employee" tooltip={t("matrix.assignSeveralTooltip")} onClick={() => setAssigningSeveral(true)}>
+              {t("matrix.assignSeveral")}
             </Button>
           )}
-          <Button icon="refresh" tooltip="Load the current data from SAP FSM" disabled={loading} onClick={reload}>
-            Refresh
+          <Button icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
+            {t("action.refresh")}
           </Button>
         </span>
       </div>
       {error && <LoadError message={error} onRetry={reload} />}
 
       {data.skills.length === 0 ? (
-        <IllustratedMessage
-          name="NoEntries"
-          titleText="No skills yet"
-          subtitleText="The matrix shows your skills as columns. Create the first one in the catalogue."
-        >
-          <Button onClick={() => router.push("/catalog")}>Open skill catalogue</Button>
+        <IllustratedMessage name="NoEntries" titleText={t("matrix.noSkillsTitle")} subtitleText={t("matrix.noSkillsText")}>
+          <Button onClick={() => router.push("/catalog")}>{t("matrix.openCatalog")}</Button>
         </IllustratedMessage>
       ) : (
         <div className={shell.panel}>
+          {aiEnabled && (
+            <AskMatrix
+              skills={data.skills}
+              levelNames={levelNames}
+              onFilters={(asked) => {
+                setSearch(asked.search);
+                setSkillIds(asked.skillIds);
+                setStatusFilters(asked.statuses);
+                setLevels(asked.levels);
+              }}
+            />
+          )}
           <MatrixFilters
             skills={data.skills}
             levelNames={levelNames}
@@ -192,7 +198,7 @@ export function SkillMatrix() {
           />
 
           <AnalyticalTable
-            header={<Title level="H5">Persons ({persons.length})</Title>}
+            header={<Title level="H5">{t("matrix.persons", { count: persons.length })}</Title>}
             columns={columns}
             data={persons}
             tableHooks={TABLE_HOOKS}
@@ -203,7 +209,7 @@ export function SkillMatrix() {
             sortable={false}
             filterable={false}
             groupable={false}
-            noDataText="No persons match the filters."
+            noDataText={t("matrix.noPersons")}
           />
         </div>
       )}
