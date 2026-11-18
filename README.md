@@ -4,7 +4,7 @@ Hi, I'm Paula, and this is my solution to the [assessment](ASSIGNMENT.md).
 
 The app answers one question for a service manager: who has which skill, backed by which certificate, valid until when. Everything is read from and written to SAP FSM through the proxy you provided. There is no other database.
 
-It also has five small AI helpers. You can ask the matrix a question, it reads the dates from a certificate for you, and it turns a pile of certificates into assignments that you only have to check. I did not just trust them: I measured them, 29 cases, five runs each. More in [The AI part](#the-ai-part).
+It also has five small AI helpers. You can ask the matrix a question, it reads the dates from a certificate for you, and it turns a pile of certificates into assignments that you only have to check. I did not just trust them: I measured them, 36 cases, five runs each. More in [The AI part](#the-ai-part).
 
 A hosted copy runs on Vercel. The link and the access code are in my email.
 
@@ -241,14 +241,14 @@ Persons and assignments from FSM are never sent. A certificate is the one case w
 
 ### Measuring it
 
-"It seems to work" was not enough for me, so `npm run eval:ai` calls the real model with 29 known cases and compares the result. With `-- 5` every case runs five times and counts only if all five are right. The last result is in [tests/ai-eval/last-run.txt](tests/ai-eval/last-run.txt): 29 of 29, between 1.2 and 1.6 seconds per call.
+"It seems to work" was not enough for me, so `npm run eval:ai` calls the real model with 36 known cases and compares the result. With `-- 5` every case runs five times and counts only if all five are right. The last result is in [tests/ai-eval/last-run.txt](tests/ai-eval/last-run.txt): 36 of 36, between 1.1 and 1.5 seconds per call.
 
 Running it several times showed me two things I had not expected:
 
 - Two cases passed in one run and failed in the next, with the same model: the column title "MA", and a question that asks for a status and a missing certificate at once. I made both prompts clearer and added control cases with wording the prompt does not mention, to see that the fix is general.
 - I had started with the strong model for certificates, assuming a scan needs it. Then I compared both on seven certificates, two of them made to look like phone photos. Same answers, 1.4 instead of 1.9 seconds, at a fraction of the cost. So the app now uses one small model. The two runs are in [tests/ai-eval/model-comparison.txt](tests/ai-eval/model-comparison.txt).
 
-The newest helper, reading certificates for the import, has seven cases of its own, one of them a licence for a skill that is not in the catalogue. They were added after that run, so the file does not show them yet.
+The newest helper, reading certificates for the import, has seven cases of its own. One of them is a licence for a skill that is not in the catalogue, and the right answer there is "none".
 
 To be fair, the cases are few and I made them myself. I know the prompts work on these inputs. I do not know yet how they do on every scan a technician will upload.
 
