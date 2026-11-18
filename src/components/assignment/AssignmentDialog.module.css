@@ -106,7 +106,7 @@
 .viewer {
   display: grid;
   gap: 1rem;
-  width: min(52rem, 90vw);
+  width: min(52rem, calc(90vw - 4rem));
   padding: 0.5rem 0;
 }
 

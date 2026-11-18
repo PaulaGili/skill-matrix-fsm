@@ -75,9 +75,9 @@ Create, rename, delete. The number shows how many people hold a skill, and a cli
 
 ### What runs out soon
 
-The page I would open every Monday. Soonest first, for the next 30 to 180 days, or what has already expired.
+The page I would open every Monday. Soonest first, for the next 30 to 180 days, or what has already expired. After a yearly training, tick the whole crew and give everyone the new end date in one go.
 
-![The list of assignments that end soon](docs/images/expiring.png)
+![The list of assignments that end soon, three of them ticked, and the dialog that gives them one new end date](docs/images/expiring.png)
 
 ### My skills
 
@@ -114,6 +114,7 @@ From the optional list I did the expiry overview, the person view, "My skills", 
 I also added a few things that I thought a real service manager would ask for next:
 
 - import of assignments from Excel or CSV, with every row checked before anything is saved,
+- renewing several assignments at once from the expiry page,
 - a history of changes with undo,
 - five small AI helpers, and an evaluation that measures them,
 - a read-only MCP server, so an AI assistant can query the matrix.
@@ -135,7 +136,7 @@ Useful to know:
 
 | Command | What it does |
 |---|---|
-| `npm run gate` | Everything CI runs: types, lint, format, 146 unit tests, build, a check that no secret is in the browser files, 20 browser tests. Run `npx playwright install chromium` once before it. |
+| `npm run gate` | Everything CI runs: types, lint, format, 147 unit tests, build, a check that no secret is in the browser files, 21 browser tests. Run `npx playwright install chromium` once before it. |
 | `npm run seed` | Writes demo data to FSM in your namespace: 7 skills, 13 assignments, 5 certificates. |
 | `npm run cleanup -- --yes` | Deletes everything in your namespace. Without `--yes` it only lists it. |
 | `npm run smoke` | Runs the service layer against the real company with one throwaway skill. Needs the app running. |
@@ -266,8 +267,8 @@ It hands the names and skills of the technicians to whichever assistant is conne
 
 ## Tests and CI
 
-- 146 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
-- 20 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
+- 147 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
+- 21 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
 - A smoke test against the real company for the things only FSM can answer.
 - GitHub Actions runs `npm run gate` on every pull request, the same command as on my machine.
 

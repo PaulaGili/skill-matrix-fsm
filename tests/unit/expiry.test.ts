@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alreadyExpired, daysUntil, dueText, expiringWithin } from "@/lib/domain/expiry";
+import { alreadyExpired, daysUntil, dueText, expiringWithin, renewalError } from "@/lib/domain/expiry";
 
 const TODAY = "2026-11-17";
 
@@ -47,5 +47,16 @@ describe("alreadyExpired", () => {
       { id: "recent", endDate: "2026-11-15" },
     ];
     expect(alreadyExpired(list, "2026-11-16").map((a) => a.id)).toEqual(["recent", "old"]);
+  });
+});
+
+describe("renewalError", () => {
+  it("accepts only a real date that is later than every current end", () => {
+    expect(renewalError(["2026-11-30", "2026-10-01"], "2027-11-30")).toBeNull();
+    expect(renewalError(["2026-11-30"], "2026-11-30")?.key).toBe("renew.notLater");
+    expect(renewalError(["2026-11-30", "2028-01-01"], "2027-11-30")?.key).toBe("renew.notLater");
+    // An assignment without an end has nothing to renew.
+    expect(renewalError([null], "2027-11-30")?.key).toBe("renew.notLater");
+    expect(renewalError(["2026-11-30"], "30.11.2027")?.key).toBe("validity.toInvalid");
   });
 });

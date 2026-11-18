@@ -97,6 +97,35 @@ test("without an AI key the Read dates button is not offered", async ({ page }) 
   await expect(page.getByRole("button", { name: "Read dates" })).toBeHidden();
 });
 
+test("ticked rows of the expiry page are renewed together with one request", async ({ page }) => {
+  const calls = await mockFsm(page);
+  await page.goto("/expiry");
+  await expect(page.getByRole("button", { name: "Renew", exact: true })).toBeDisabled();
+  await page.getByRole("checkbox", { name: "Select Welding of Baumann, Beat" }).click();
+  await page.getByRole("button", { name: "Renew 1 row" }).click();
+
+  // A date that is not later than the current end is refused before FSM is asked.
+  const newEnd = page.locator("#renew-to input");
+  await newEnd.fill(daysFromToday(10).split("-").reverse().join("."));
+  await newEnd.press("Tab");
+  await expect(page.getByRole("button", { name: "Renew 1 assignment" })).toBeDisabled();
+
+  await newEnd.fill("31.12.2030");
+  await newEnd.press("Tab");
+  await expect(page.locator("[ui5-dialog] [ui5-text]").filter({ hasText: "becomes 31.12.2030" })).toBeVisible();
+  const before = calls.length;
+  await page.getByRole("button", { name: "Renew 1 assignment" }).click();
+  await expect(page.getByText("1 assignment renewed.")).toBeVisible();
+  const writes = calls.slice(before).filter((call) => call.path === "skill/v2/skills");
+  expect(writes).toHaveLength(1);
+  expect(writes[0].body).toMatchObject([{ id: "A2", tagId: "T1", technician: "P2", endDate: "2030-12-31", validityType: "LF" }]);
+  await expect(page.getByText("Baumann, Beat")).toBeHidden();
+
+  // The renewal is in the history and can be undone.
+  await page.goto("/history");
+  await expect(page.getByRole("button", { name: "Undo: Baumann, Beat, Welding" })).toBeVisible();
+});
+
 test("the expiry page lists what ends soon, and on request what has already expired", async ({ page }) => {
   const calls = await mockFsm(page);
   await page.goto("/expiry");
