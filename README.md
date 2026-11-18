@@ -10,9 +10,20 @@ A hosted copy runs on Vercel. The link and the access code are in my email.
 
 I hope you like it.
 
+Where to find what:
+
+| Where | What |
+|---|---|
+| This README | A tour, how to run it, the main decisions, limitations, how I used AI tools |
+| [docs/decisions.md](docs/decisions.md) | Every decision with its reason and its price, a summary table first |
+| [tests/ai-eval](tests/ai-eval) | The cases of the AI evaluation and the result of the last run |
+| [samples](samples) | Three files to try the import |
+| [AGENTS.md](AGENTS.md) | The rules the coding assistant worked under |
+| [Closed pull requests](https://github.com/PaulaGili/skill-matrix-fsm/pulls?q=is%3Apr+is%3Aclosed) | How the work was split, one topic per pull request |
+
 ## A quick tour
 
-The screenshots show the demo mode, which runs on invented data. The AI is switched off there, so the two AI pictures show the answers the model gave to the same inputs in the evaluation.
+The screenshots show the demo mode, which runs on invented data. The AI is switched off there, so in the three AI pictures the answer of the model was put in by hand: for "Ask" and "Read dates" the one it gave in the evaluation, for the pile of certificates an example.
 
 ### The matrix
 
@@ -81,6 +92,12 @@ Most teams already keep this list in Excel. Every row is checked and says why it
 ![The import preview: two rows ready, four rows with the reason why not](docs/images/import.png)
 
 Want to try it? The [`samples`](samples) folder has three files ready, one of them full of mistakes on purpose.
+
+### A pile of certificates
+
+The training centre sends ten PDFs. Choose them all at once: the AI reads holder, skill and dates from each, the code checks every row against FSM, and you tick what goes in. Each file ends up attached to its assignment.
+
+![The import preview filled from five certificates: two rows ready, three with the reason why not](docs/images/import-certificates.png)
 
 ### Auch auf Deutsch
 
