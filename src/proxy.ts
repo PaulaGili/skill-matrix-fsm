@@ -2,10 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { accessAllowed, closedInDemo, needsAccessCode } from "@/lib/access";
 import { guardFsmWrite } from "@/lib/fsm/own-data";
 
+// The tab icon needs no code: a browser asks for it without one and would show none.
+const OPEN_PATHS = ["/icon.png", "/apple-icon.png"];
+
 // Runs before every page and every API route. With APP_ACCESS_CODE set, nothing is served
 // without the code: the FSM proxy and the AI routes included. Without it, as on a developer
 // machine, everything passes. Writes to FSM are checked in every case.
 export async function proxy(request: NextRequest) {
+  if (OPEN_PATHS.includes(request.nextUrl.pathname)) return NextResponse.next();
   const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   if (demo && closedInDemo(request.nextUrl.pathname)) return new NextResponse("Not available in the demo.", { status: 403 });
   // Vercel sets VERCEL on its servers.
