@@ -1,33 +1,8 @@
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   align-items: center;
-}
-
-.search {
-  width: 16rem;
-}
-
-.skills {
-  width: 18rem;
-}
-
-.levels {
-  width: 13rem;
-}
-
-.inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .person {
@@ -40,27 +15,26 @@
   color: var(--sapContent_LabelColor);
 }
 
-/* A cell is a plain button that fills the table cell and opens the assignment dialog. */
+/* A cell is a UI5 button that fills the table cell and opens the assignment dialog. */
 .cellButton {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: inherit;
-  line-height: 1.35;
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
 }
 
-.cellButton:focus-visible {
-  outline: var(--sapContent_FocusWidth) var(--sapContent_FocusStyle) var(--sapContent_FocusColor);
-  outline-offset: -2px;
+/* The cell has its own padding. With the button's as well, the second line would be cut. */
+.cellButton::part(button) {
+  padding-inline: 0;
+}
+
+/* Two lines in the normal text weight, not in the weight of a button label. */
+.cellContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--sapFontFamily);
+  font-weight: normal;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .cellStatus {
@@ -76,7 +50,7 @@
 }
 
 .cellButton:hover .assign,
-.cellButton:focus-visible .assign {
+.cellButton:focus-within .assign {
   visibility: visible;
 }
 
@@ -87,34 +61,8 @@
   }
 }
 
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1.5rem;
-}
-
-.spacer {
-  flex: 1;
-}
-
+/* As wide as the first two filters below it and the space between them. */
 .ask {
-  flex: 1;
-  min-width: 16rem;
-  max-width: 44rem;
-}
-
-/* Phone: the title goes above the buttons and the filters take the full width. */
-@media (max-width: 40rem) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .search,
-  .skills,
-  .levels {
-    width: 100%;
-  }
+  width: 29rem;
+  max-width: 100%;
 }

@@ -9,7 +9,7 @@ import styles from "./ExportDialog.module.css";
 
 interface Props {
   name: string; // start of the file name, the date is added
-  getRows: () => string[][]; // the table as shown, header row first
+  getRows: () => string[][]; // the table with the active filters, header row first
   onError: (message: string) => void;
 }
 
@@ -53,8 +53,8 @@ function saveChoice(name: string, choice: Choice) {
   } catch {}
 }
 
-// The Export button and its dialog: choose the columns, then the format.
-export function ExportButton({ name, getRows, onError }: Props) {
+// The export dialog and the function that opens it: choose the columns, then the format.
+export function useExport({ name, getRows, onError }: Props) {
   const [rows, setRows] = useState<string[][] | null>(null);
   const [choice, setChoice] = useState(DEFAULTS);
   const { t } = useI18n();
@@ -81,79 +81,67 @@ export function ExportButton({ name, getRows, onError }: Props) {
 
   const nothingChosen = rows !== null && rows[0].every((column) => skipped.includes(column));
   const allChosen = rows !== null && !rows[0].some((column) => skipped.includes(column));
-  return (
-    <>
-      <Button
-        design="Transparent"
-        icon="download"
-        tooltip={t("export.tooltip")}
-        onClick={() => {
-          setChoice(loadChoice(name));
-          setRows(getRows());
-        }}
-      >
-        {t("action.export")}
-      </Button>
-      {rows && (
-        <Dialog
-          open
-          headerText={t("export.title")}
-          onClose={() => setRows(null)}
-          footer={
-            <Bar
-              design="Footer"
-              endContent={
-                <>
-                  <Button design="Emphasized" disabled={nothingChosen} onClick={exportFile}>
-                    {t("action.export")}
-                  </Button>
-                  <Button design="Transparent" onClick={() => setRows(null)}>
-                    {t("action.cancel")}
-                  </Button>
-                </>
-              }
-            />
+  const open = () => {
+    setChoice(loadChoice(name));
+    setRows(getRows());
+  };
+  const dialog = rows && (
+    <Dialog
+      open
+      headerText={t("export.title")}
+      onClose={() => setRows(null)}
+      footer={
+        <Bar
+          design="Footer"
+          endContent={
+            <>
+              <Button design="Emphasized" disabled={nothingChosen} onClick={exportFile}>
+                {t("action.export")}
+              </Button>
+              <Button design="Transparent" onClick={() => setRows(null)}>
+                {t("action.cancel")}
+              </Button>
+            </>
           }
-        >
-          <div className={styles.columns}>
-            <Label>{t("export.columns", { count: rows.length - 1 })}</Label>
-            <CheckBox
-              text={t("export.allColumns")}
-              checked={!nothingChosen}
-              indeterminate={!nothingChosen && !allChosen}
-              onChange={() => setChoice({ ...choice, skipped: allChosen ? [...rows[0]] : skipped.filter((column) => !rows[0].includes(column)) })}
-            />
-            {rows[0].map((column, index) => (
-              <CheckBox
-                key={index}
-                className={styles.column}
-                text={column}
-                checked={!skipped.includes(column)}
-                onChange={() =>
-                  setChoice({ ...choice, skipped: skipped.includes(column) ? skipped.filter((other) => other !== column) : [...skipped, column] })
-                }
-              />
-            ))}
-            <Label className={styles.separator}>{t("export.format")}</Label>
-            <RadioButton name="export-format" text="Excel (.xlsx)" checked={format === "xlsx"} onChange={() => setChoice({ ...choice, format: "xlsx" })} />
-            <RadioButton name="export-format" text="CSV (.csv)" checked={format === "csv"} onChange={() => setChoice({ ...choice, format: "csv" })} />
-            {format === "csv" && (
-              <>
-                <Label for="csv-separator" className={styles.separator}>
-                  {t("export.csvSeparator")}
-                </Label>
-                <Select id="csv-separator" onChange={(event) => setChoice({ ...choice, separator: event.detail.selectedOption.dataset.value ?? "," })}>
-                  {SEPARATORS.map((option) => (
-                    <Option key={option.text} data-value={option.value} selected={option.value === separator}>
-                      {t(option.text)}
-                    </Option>
-                  ))}
-                </Select>
-              </>
-            )}
-          </div>
-        </Dialog>
-      )}
-    </>
+        />
+      }
+    >
+      <div className={styles.columns}>
+        <Label>{t("export.columns", { count: rows.length - 1 })}</Label>
+        <CheckBox
+          text={t("export.allColumns")}
+          checked={!nothingChosen}
+          indeterminate={!nothingChosen && !allChosen}
+          onChange={() => setChoice({ ...choice, skipped: allChosen ? [...rows[0]] : skipped.filter((column) => !rows[0].includes(column)) })}
+        />
+        {rows[0].map((column, index) => (
+          <CheckBox
+            key={index}
+            className={styles.column}
+            text={column}
+            checked={!skipped.includes(column)}
+            onChange={() => setChoice({ ...choice, skipped: skipped.includes(column) ? skipped.filter((other) => other !== column) : [...skipped, column] })}
+          />
+        ))}
+        <Label className={styles.separator}>{t("export.format")}</Label>
+        <RadioButton name="export-format" text="Excel (.xlsx)" checked={format === "xlsx"} onChange={() => setChoice({ ...choice, format: "xlsx" })} />
+        <RadioButton name="export-format" text="CSV (.csv)" checked={format === "csv"} onChange={() => setChoice({ ...choice, format: "csv" })} />
+        {format === "csv" && (
+          <>
+            <Label for="csv-separator" className={styles.separator}>
+              {t("export.csvSeparator")}
+            </Label>
+            <Select id="csv-separator" onChange={(event) => setChoice({ ...choice, separator: event.detail.selectedOption.dataset.value ?? "," })}>
+              {SEPARATORS.map((option) => (
+                <Option key={option.text} data-value={option.value} selected={option.value === separator}>
+                  {t(option.text)}
+                </Option>
+              ))}
+            </Select>
+          </>
+        )}
+      </div>
+    </Dialog>
   );
+  return { open, dialog };
 }

@@ -9,6 +9,11 @@
   box-sizing: border-box;
 }
 
+/* The UI5 status icon is sized for the default box model. With border-box it touches the text. */
+[data-component-name="ObjectStatusIconContainer"] {
+  box-sizing: content-box;
+}
+
 html,
 body {
   margin: 0;

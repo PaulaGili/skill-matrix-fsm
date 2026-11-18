@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysUntil, dueText, expiringWithin } from "@/lib/domain/expiry";
+import { alreadyExpired, daysUntil, dueText, expiringWithin } from "@/lib/domain/expiry";
 
 const TODAY = "2026-11-17";
 
@@ -33,5 +33,19 @@ describe("daysUntil and dueText", () => {
     expect(dueText(0)).toEqual({ key: "due.today" });
     expect(dueText(1)).toEqual({ key: "due.tomorrow" });
     expect(dueText(14)).toEqual({ key: "due.inDays", params: { count: 14 } });
+    expect(dueText(-1)).toEqual({ key: "due.yesterday" });
+    expect(dueText(-20)).toEqual({ key: "due.daysAgo", params: { count: 20 } });
+  });
+});
+
+describe("alreadyExpired", () => {
+  it("keeps what ended before today, the latest first", () => {
+    const list = [
+      { id: "old", endDate: "2026-01-31" },
+      { id: "today", endDate: "2026-11-16" },
+      { id: "open", endDate: null },
+      { id: "recent", endDate: "2026-11-15" },
+    ];
+    expect(alreadyExpired(list, "2026-11-16").map((a) => a.id)).toEqual(["recent", "old"]);
   });
 });

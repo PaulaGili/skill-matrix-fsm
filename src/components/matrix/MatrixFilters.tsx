@@ -1,11 +1,11 @@
 "use client";
 
-import { Button, Icon, Input, Label, MultiComboBox, MultiComboBoxItem, ToggleButton } from "@ui5/webcomponents-react";
+import { FilterBar, FilterGroupItem, Icon, Input, MultiComboBox, MultiComboBoxItem } from "@ui5/webcomponents-react";
 import { CELL_FILTERS, type CellFilter } from "@/lib/domain/matrix";
+import shell from "@/components/common/AppShell.module.css";
 import type { Skill } from "@/lib/fsm/services/model";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import type { Translate } from "@/lib/i18n/translate";
-import styles from "./SkillMatrix.module.css";
 
 // The status filters are named like the statuses.
 export function filterLabel(filter: CellFilter, t: Translate): string {
@@ -31,30 +31,39 @@ export function MatrixFilters(props: Props) {
   const anyFilter = search !== "" || skillIds.length > 0 || levels.length > 0 || statusFilters.length > 0;
   const { t } = useI18n();
   return (
-    <div className={styles.filters}>
-      <Input
-        className={styles.search}
-        placeholder={t("filter.searchPerson")}
-        accessibleName={t("filter.searchPerson")}
-        showClearIcon
-        icon={<Icon name="search" />}
-        value={search}
-        onInput={(event) => onSearch(event.target.value)}
-      />
-      <MultiComboBox
-        className={styles.skills}
-        placeholder={t("filter.bySkills")}
-        accessibleName={t("filter.bySkills")}
-        title={t("filter.bySkillsHelp")}
-        onSelectionChange={(event) => onSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
-      >
-        {skills.map((skill) => (
-          <MultiComboBoxItem key={skill.id} text={skill.name} data-id={skill.id} selected={skillIds.includes(skill.id)} />
-        ))}
-      </MultiComboBox>
-      {levelNames.length > 0 && (
+    <FilterBar
+      className={shell.filterBar}
+      filterContainerWidth="13rem"
+      hideFilterConfiguration
+      hideToggleFiltersButton
+      hideToolbar
+      showClearOnFB={anyFilter}
+      onClear={onClearAll}
+    >
+      <FilterGroupItem filterKey="person" label={t("field.person")}>
+        <Input
+          placeholder={t("filter.searchPerson")}
+          accessibleName={t("filter.searchPerson")}
+          showClearIcon
+          icon={<Icon name="search" />}
+          value={search}
+          onInput={(event) => onSearch(event.target.value)}
+        />
+      </FilterGroupItem>
+      <FilterGroupItem filterKey="skills" label={t("field.skill")}>
         <MultiComboBox
-          className={styles.levels}
+          placeholder={t("filter.bySkills")}
+          accessibleName={t("filter.bySkills")}
+          title={t("filter.bySkillsHelp")}
+          onSelectionChange={(event) => onSkillIds(event.detail.items.map((item) => item.dataset.id ?? ""))}
+        >
+          {skills.map((skill) => (
+            <MultiComboBoxItem key={skill.id} text={skill.name} data-id={skill.id} selected={skillIds.includes(skill.id)} />
+          ))}
+        </MultiComboBox>
+      </FilterGroupItem>
+      <FilterGroupItem filterKey="level" label={t("field.level")} hiddenInFilterBar={levelNames.length === 0}>
+        <MultiComboBox
           placeholder={t("filter.byLevel")}
           accessibleName={t("filter.byLevel")}
           onSelectionChange={(event) => onLevels(event.detail.items.map((item) => item.text ?? ""))}
@@ -63,30 +72,18 @@ export function MatrixFilters(props: Props) {
             <MultiComboBoxItem key={name} text={name} selected={levels.includes(name)} />
           ))}
         </MultiComboBox>
-      )}
-      <span className={styles.inline} role="group" aria-label={t("filter.showOnlyGroup")}>
-        <Label>{t("filter.showOnly")}</Label>
-        {CELL_FILTERS.map((filter) => {
-          const active = statusFilters.includes(filter);
-          const label = filterLabel(filter, t);
-          return (
-            <ToggleButton
-              key={filter}
-              tooltip={t(`filterHelp.${filter}`)}
-              pressed={active}
-              accessibleName={t(active ? "filter.on" : "filter.off", { label })}
-              onClick={() => onStatusFilters(active ? statusFilters.filter((other) => other !== filter) : [...statusFilters, filter])}
-            >
-              {label}
-            </ToggleButton>
-          );
-        })}
-        {anyFilter && (
-          <Button design="Attention" icon="clear-filter" onClick={onClearAll}>
-            {t("filter.clear")}
-          </Button>
-        )}
-      </span>
-    </div>
+      </FilterGroupItem>
+      <FilterGroupItem filterKey="status" label={t("field.status")}>
+        <MultiComboBox
+          placeholder={t("filter.byStatus")}
+          accessibleName={t("filter.byStatus")}
+          onSelectionChange={(event) => onStatusFilters(event.detail.items.map((item) => item.dataset.filter as CellFilter))}
+        >
+          {CELL_FILTERS.map((filter) => (
+            <MultiComboBoxItem key={filter} text={filterLabel(filter, t)} data-filter={filter} selected={statusFilters.includes(filter)} />
+          ))}
+        </MultiComboBox>
+      </FilterGroupItem>
+    </FilterBar>
   );
 }
