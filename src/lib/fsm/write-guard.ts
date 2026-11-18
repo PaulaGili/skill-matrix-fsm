@@ -2,6 +2,7 @@
 // ours. The checks in the services run in the browser and give the user a clear message.
 // This one cannot be skipped by calling the proxy directly.
 import { isOwnName } from "@/lib/candidate";
+import { checkCertificateFile } from "@/lib/domain/certificate";
 
 // What FSM holds in our namespace, read on the server when a write needs it.
 export interface OwnData {
@@ -81,7 +82,11 @@ export async function writeRefusal(method: string, segments: string[], body: unk
   // Certificates (FSM attachments): uploaded to one of our skills, deleted when they hang on one.
   if (path === "data/v4/Attachment" && method === "POST" && one) {
     const target = one.object !== null && typeof one.object === "object" ? (one.object as Record<string, unknown>) : {};
-    return target.objectType === "SKILL" && (await allIn([text(target.objectId)], own.skillIds)) ? null : notOurs("an attachment");
+    if (target.objectType !== "SKILL" || !(await allIn([text(target.objectId)], own.skillIds))) return notOurs("an attachment");
+    // The same file rules as in the browser, on the size of the decoded file.
+    const content = (text(one.fileContent) ?? "").replace(/=+$/, "");
+    const file = checkCertificateFile(text(one.fileName) ?? "", Math.floor((content.length * 3) / 4));
+    return file.ok && file.type === one.type ? null : "A certificate must be a PDF, JPG or PNG of up to 5 MB.";
   }
   if (method === "DELETE" && segments.length === 4 && path.startsWith("data/v4/Attachment/")) {
     return (await allIn([segments[3]], own.attachmentIds)) ? null : notOurs("an attachment");

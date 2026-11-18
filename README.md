@@ -118,7 +118,7 @@ Useful to know:
 
 | Command | What it does |
 |---|---|
-| `npm run gate` | Everything CI runs: types, lint, format, 144 unit tests, build, a check that no secret is in the browser files, 19 browser tests. Run `npx playwright install chromium` once before it. |
+| `npm run gate` | Everything CI runs: types, lint, format, 145 unit tests, build, a check that no secret is in the browser files, 19 browser tests. Run `npx playwright install chromium` once before it. |
 | `npm run seed` | Writes demo data to FSM in your namespace: 7 skills, 13 assignments, 5 certificates. |
 | `npm run cleanup -- --yes` | Deletes everything in your namespace. Without `--yes` it only lists it. |
 | `npm run smoke` | Runs the service layer against the real company with one throwaway skill. Needs the app running. |
@@ -168,7 +168,7 @@ Deleting everything is possible too. It takes one more step, and you have to typ
 
 The proxy limits which entities can be written, but it cannot know whose tag it is. So ownership is checked twice, in two different places.
 
-On the server, a small guard stands in front of the proxy and looks at every write before it is passed on. A tag or scale has to carry my prefix, and anything that is changed or deleted has to be something FSM lists in my namespace. The server reads those ids from FSM itself and trusts nothing the browser sent. A write that the app never makes is refused, and if FSM cannot be asked, nothing is written. Calling `/api/fsm` directly does not get around it.
+On the server, a small guard stands in front of the proxy and looks at every write before it is passed on. A tag or scale has to carry my prefix, and anything that is changed or deleted has to be something FSM lists in my namespace. The server reads those ids from FSM itself and trusts nothing the browser sent. An uploaded file has to be a PDF, JPG or PNG of up to 5 MB, here as well as in the browser. A write that the app never makes is refused, and if FSM cannot be asked, nothing is written. Calling `/api/fsm` directly does not get around it.
 
 In the browser, every update and delete reads the record back first. That is where the user gets a clear message, and where the app notices that someone else changed the record in the meantime.
 
@@ -254,7 +254,7 @@ It hands the names and skills of the technicians to whichever assistant is conne
 
 ## Tests and CI
 
-- 144 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
+- 145 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
 - 19 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
 - A smoke test against the real company for the things only FSM can answer.
 - GitHub Actions runs `npm run gate` on every pull request, the same command as on my machine.
