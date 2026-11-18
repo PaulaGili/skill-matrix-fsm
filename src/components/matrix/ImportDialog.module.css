@@ -1,0 +1,11 @@
+.content {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  width: min(64rem, 90vw);
+  padding: 0.5rem 0;
+}
+
+.content > [ui5-table] {
+  width: 100%;
+}

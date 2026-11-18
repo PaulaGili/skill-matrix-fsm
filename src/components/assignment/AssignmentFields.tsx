@@ -13,6 +13,7 @@ import styles from "./AssignmentDialog.module.css";
 // The form keeps empty dates as "", which is what the date picker works with.
 export interface FieldValues {
   levelId: string | null;
+  levelName?: string | null; // only for the history of changes
   startDate: string;
   endDate: string;
 }
@@ -49,7 +50,10 @@ export function LevelField({ scaleId, value, disabled, onChange }: Props) {
       <Select
         id="assignment-level"
         disabled={disabled || levels.loading}
-        onChange={(event) => onChange({ ...value, levelId: event.detail.selectedOption.dataset.id || null })}
+        onChange={(event) => {
+          const option = event.detail.selectedOption;
+          onChange({ ...value, levelId: option.dataset.id || null, levelName: option.dataset.id ? option.textContent : null });
+        }}
       >
         <Option data-id="" selected={value.levelId === null}>
           {t("field.noLevel")}

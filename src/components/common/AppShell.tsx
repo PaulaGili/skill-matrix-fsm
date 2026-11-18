@@ -14,6 +14,7 @@ const PAGES = [
   { path: "/", title: "nav.matrix" },
   { path: "/catalog", title: "nav.catalog" },
   { path: "/expiry", title: "nav.expiry" },
+  { path: "/history", title: "nav.history" },
 ] as const;
 
 const LANGUAGES: Language[] = ["en", "de"];
@@ -39,6 +40,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const health = useHealth();
   const { language, setLanguage, t } = useI18n();
   const [helpOpen, setHelpOpen] = useState(false);
+
+  // SAP recommends the compact size for a mouse and the larger one for touch.
+  useEffect(() => {
+    document.body.toggleAttribute("data-ui5-compact-size", window.matchMedia("(pointer: fine)").matches);
+  }, []);
 
   let connection = "";
   if (DEMO_MODE) connection = t("shell.demoData");

@@ -6,6 +6,7 @@ export const de: Dictionary = {
   "nav.matrix": "Qualifikationsmatrix",
   "nav.catalog": "Qualifikationskatalog",
   "nav.expiry": "Ablaufend",
+  "nav.history": "Änderungen",
 
   "shell.notConnected": "SAP FSM nicht verbunden",
   "shell.demoData": "Demodaten",
@@ -85,6 +86,10 @@ export const de: Dictionary = {
   "matrix.noSkillsText": "Die Matrix zeigt Ihre Qualifikationen als Spalten. Legen Sie die erste im Katalog an.",
   "matrix.openCatalog": "Qualifikationskatalog öffnen",
   "matrix.persons": "Personen ({count})",
+  "matrix.summary.expired": "{count} abgelaufen",
+  "matrix.summary.expiring": "{count} bald ablaufend",
+  "matrix.summary.noCertificate": "{count} ohne Zertifikat",
+  "matrix.summaryHelp": "Nur diese anzeigen",
   "matrix.noPersons": "Keine Personen entsprechen den Filtern.",
 
   "cell.unassignedTitle": "Nicht zugewiesen. Klicken zum Zuweisen.",
@@ -133,15 +138,21 @@ export const de: Dictionary = {
     "Jede Zeile ist eine Person, jede Spalte eine Qualifikation. Klicken Sie auf eine Zelle, um die Qualifikation zuzuweisen oder Stufe, Gültigkeit und Zertifikate zu ändern.",
   "help.matrixFilters":
     "Wählen Sie im Filter Qualifikationen aus, um zu sehen, wer heute alle davon besitzt: Gültig und Läuft bald ab werden für Sie eingeschaltet und können geändert werden. Die Schaltflächen bei Nur anzeigen filtern nach Status: Mehrere Status sind Alternativen, Kein Zertifikat ist eine zusätzliche Bedingung. Sind Qualifikationen ausgewählt, gilt der Status für diese Qualifikationen: Schweissen und Abgelaufen zeigt, bei wem Schweissen abgelaufen ist. Der Stufenfilter funktioniert gleich. Bei aktivem Filter werden nur die passenden Zuweisungen angezeigt; der Rest der Zeile bleibt leer, und Qualifikationen ohne Treffer werden ausgeblendet. Klicken Sie erneut auf eine Schaltfläche, um sie auszuschalten.",
+  "help.sorting":
+    "Die Zahlen über der Tabelle zeigen, was Aufmerksamkeit braucht; ein Klick zeigt nur diese an. Ein Klick auf einen Spaltenkopf sortiert, und eine Qualifikationsspalte lässt sich durch Ziehen verschieben.",
   "help.systemUsers": "Systembenutzer sind die Anmeldekonten derselben Personen. Sie sind ausgeblendet, solange Sie sie nicht einschalten.",
   "help.ask":
     "Wird das Feld Fragen angezeigt, setzt eine Frage in eigenen Worten die Filter für Sie. Nur die Frage und die Namen der Qualifikationen und Stufen werden an den KI-Dienst gesendet.",
+  "help.import":
+    "Importieren legt bis zu 20 Zuweisungen aus einer Excel- oder CSV-Datei an. Jede Zeile wird geprüft und zuerst angezeigt, und nichts wird gespeichert, bevor Sie bestätigen.",
   "help.assignSeveral":
     "Mehreren zuweisen weist eine Qualifikation bis zu 20 Personen gleichzeitig zu, mit derselben Stufe und denselben oder individuellen Daten.",
   "help.catalogText":
     "Qualifikationen anlegen, umbenennen und löschen. Eine noch zugewiesene Qualifikation kann stillgelegt werden: Ihre gültigen Zuweisungen werden beendet, Verlauf und Zertifikate bleiben erhalten; Zuweisungen, die nach heute beginnen, werden entfernt. Oder sie wird zusammen mit allem, was daran hängt, gelöscht.",
   "help.expiryText":
     "Alle Zuweisungen, die in den nächsten 30, 60, 90 oder 180 Tagen enden, die früheste zuerst. Bearbeiten Sie eine Zeile, um die Zuweisung zu verlängern oder das neue Zertifikat hinzuzufügen.",
+  "help.historyText":
+    "Die Änderungen an Zuweisungen in diesem Browser, die neueste zuerst. Die letzte Änderung einer Zuweisung kann rückgängig gemacht werden. Gelöschte Zertifikate kommen nicht zurück.",
   "help.languageText":
     "Wechseln Sie mit EN und DE in der Kopfleiste zwischen Englisch und Deutsch. Die Auswahl wird in diesem Browser gespeichert. Namen von Qualifikationen, Personen und Stufen werden so angezeigt, wie sie in SAP FSM gespeichert sind.",
 
@@ -195,7 +206,7 @@ export const de: Dictionary = {
   "facts.toDiffersOpen": "Auf dem Zertifikat steht gültig bis {certificate}, die Zuweisung hat kein Enddatum.",
 
   "bulk.title": "Qualifikation mehreren Personen zuweisen",
-  "bulk.assignTo": { one: "{count} Person zuweisen", other: "{count} Personen zuweisen" },
+  "bulk.assignTo": { one: "An {count} Person zuweisen", other: "An {count} Personen zuweisen" },
   "bulk.assigned": { one: "{skill} wurde {count} Person zugewiesen.", other: "{skill} wurde {count} Personen zugewiesen." },
   "bulk.tooMany": "Wählen Sie höchstens {max} Personen gleichzeitig aus.",
   "bulk.candidates": "Personen ohne diese Qualifikation ({count})",
@@ -214,6 +225,8 @@ export const de: Dictionary = {
   "skill.saved": "Qualifikation gespeichert.",
   "skill.created": "Qualifikation angelegt.",
   "skill.duplicate": "Eine Qualifikation mit diesem Namen existiert bereits.",
+  "skill.similar": 'Im Katalog gibt es bereits "{name}", das dasselbe zu bedeuten scheint. Legen Sie diese Qualifikation nur an, wenn es eine andere ist.',
+  "skill.createAnyway": "Trotzdem anlegen",
   "skill.nameRequired": "Name ist erforderlich.",
   "skill.nameSeparator": 'Name darf "::" nicht enthalten.',
   "skill.nameTooLong": "Name ist zu lang.",
@@ -238,6 +251,50 @@ export const de: Dictionary = {
   "remove.typeName": "Geben Sie zur Bestätigung den Namen der Qualifikation ein",
 
   "expiry.title": "Ablaufende Zuweisungen ({count})",
+  "import.button": "Importieren",
+  "import.tooltip": "Zuweisungen aus einer Excel- oder CSV-Datei anlegen",
+  "import.title": "Zuweisungen importieren",
+  "import.intro":
+    "Wählen Sie eine Excel- oder CSV-Datei mit einer Zuweisung pro Zeile und einer Kopfzeile. Bis zu {max} Zeilen. Sie sehen jede Zeile, bevor etwas gespeichert wird.",
+  "import.chooseFile": "Datei wählen",
+  "import.tooMany": "Die Datei hat {count} Zeilen. Teilen Sie sie in Dateien mit bis zu {max} Zeilen auf.",
+  "import.unreadable": "Die Datei konnte nicht gelesen werden. Verwenden Sie eine .xlsx- oder .csv-Datei mit einer Kopfzeile.",
+  "import.noColumns": "Die Spalten für Person und Qualifikation wurden nicht gefunden. Benennen Sie sie Person und Qualifikation.",
+  "import.columns": "Verwendete Spalten: {columns}.",
+  "import.columnsByAi": "Die Spalten wurden von der KI nur anhand ihrer Titel zugeordnet.",
+  "import.notUsed": "Nicht verwendet, diese Werte werden nicht importiert: {columns}.",
+  "import.row": "Zeile",
+  "import.result": "Ergebnis",
+  "import.ready": "Bereit",
+  "import.select": "Zeile {line} importieren",
+  "import.confirm": { one: "{count} Zuweisung importieren", other: "{count} Zuweisungen importieren" },
+  "import.done": { one: "{count} Zuweisung importiert.", other: "{count} Zuweisungen importiert." },
+  "import.noPerson": "Kein Techniker mit diesem Namen.",
+  "import.manyPersons": "Mehrere Techniker haben diesen Namen.",
+  "import.noSkill": "Keine Qualifikation mit diesem Namen.",
+  "import.noLevel": "Diese Stufe gibt es für die Qualifikation nicht.",
+  "import.badDate": "Ein Datum konnte nicht gelesen werden. Verwenden Sie 31.12.2027.",
+  "import.alreadyAssigned": "Die Person hat diese Qualifikation bereits.",
+  "import.twice": "Dieselbe Person und Qualifikation stehen in einer früheren Zeile.",
+  "history.title": "Letzte Änderungen ({count})",
+  "history.intro":
+    "Änderungen an Zuweisungen in diesem Browser, die neueste zuerst. Nur die letzte Änderung einer Zuweisung kann rückgängig gemacht werden, und gelöschte Zertifikate kommen nicht zurück.",
+  "history.emptyTitle": "Noch keine Änderungen",
+  "history.emptyText": "Zuweisungen, die Sie in diesem Browser hinzufügen, ändern oder entfernen, werden hier aufgelistet.",
+  "history.when": "Wann",
+  "history.change": "Änderung",
+  "history.assigned": "Zugewiesen",
+  "history.removed": "Entfernt",
+  "history.lostCertificates": { one: "{count} Zertifikat wurde gelöscht", other: "{count} Zertifikate wurden gelöscht" },
+  "history.edited.level": "Stufe von {before} auf {after} geändert",
+  "history.edited.validFrom": "Gültig ab von {before} auf {after} geändert",
+  "history.edited.validTo": "Gültig bis von {before} auf {after} geändert",
+  "history.none": "keine Angabe",
+  "history.hasCertificates": "Diese Zuweisung hat ein Zertifikat. Entfernen Sie sie in der Matrix, wenn sie wirklich nicht gewünscht ist.",
+  "history.undo": "Rückgängig",
+  "history.undoLabel": "Rückgängig: {person}, {skill}",
+  "history.undone": "Rückgängig gemacht",
+  "history.undoneToast": "Die Änderung wurde rückgängig gemacht.",
   "expiry.tableName": "Ablaufende Zuweisungen",
   "expiry.next": "Nächste",
   "expiry.days": "{count} Tage",
@@ -256,6 +313,10 @@ export const de: Dictionary = {
   "error.assignmentConflict": "Jemand anderes hat diese Zuweisung in der Zwischenzeit geändert. Laden Sie neu und versuchen Sie es erneut.",
   "error.notAssignmentOfSkill": "Zuweisung {id} ist keine Zuweisung von {skill}.",
   "error.tooManyPersons": "Es können höchstens {max} Personen gleichzeitig zugewiesen werden.",
+  "error.levelNotCleared": {
+    one: "Die Zuweisungen wurden angelegt, aber {count} hat die Stufe {level} statt keiner Stufe. Öffnen Sie sie und entfernen Sie die Stufe.",
+    other: "Die Zuweisungen wurden angelegt, aber {count} haben die Stufe {level} statt keiner Stufe. Öffnen Sie sie und entfernen Sie die Stufe.",
+  },
   "error.alreadyAssigned": {
     one: "Diese Person hat {skill} bereits. Laden Sie neu und versuchen Sie es erneut.",
     other: "{count} dieser Personen haben {skill} bereits. Laden Sie neu und versuchen Sie es erneut.",
@@ -269,5 +330,6 @@ export const de: Dictionary = {
   "ai.unavailable": "Der KI-Dienst ist nicht verfügbar.",
   "ai.certificateNotRead": "Das Zertifikat konnte nicht gelesen werden.",
   "ai.questionFailed": "Die Frage konnte nicht beantwortet werden.",
+  "ai.columnsNotMatched": "Die Spalten konnten nicht zugeordnet werden.",
   "ai.nameNotChecked": "Der Name konnte nicht geprüft werden.",
 };

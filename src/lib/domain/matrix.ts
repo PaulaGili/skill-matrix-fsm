@@ -114,3 +114,20 @@ export function skillsWithMatches<S extends { id: string }>(
     }),
   );
 }
+
+// What needs attention among the given persons: the overview above the matrix.
+export function summarize(personIds: string[], cells: Map<string, Cell<AssignmentLike>>): Record<"expired" | "expiring" | "noCertificate", number> {
+  const shown = [...cells.values()].filter((cell) => personIds.includes(cell.assignment.personId));
+  return {
+    expired: shown.filter((cell) => cell.status === "expired").length,
+    expiring: shown.filter((cell) => cell.status === "expiring").length,
+    noCertificate: shown.filter((cell) => !cell.hasCertificate).length,
+  };
+}
+
+// Sorting a skill column puts the problems first and the persons without the skill last.
+const SORT_ORDER: AssignmentStatus[] = ["expired", "expiring", "notYetValid", "valid", "unassigned"];
+
+export function sortRank(cell: Cell<AssignmentLike> | undefined): number {
+  return SORT_ORDER.indexOf(cell?.status ?? "unassigned");
+}

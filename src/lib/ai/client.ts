@@ -1,5 +1,6 @@
 // Browser side of the AI features. The key never leaves the server.
 import { existingSkill, type CertificateFacts } from "@/lib/domain/certificate-facts";
+import { columnsFromHeaders, type ColumnMap, type ImportField } from "@/lib/domain/import";
 import type { QuestionAnswer } from "@/lib/domain/question";
 import { fileToBase64 } from "@/lib/fsm/client";
 import { UserError, type MessageKey } from "@/lib/i18n/translate";
@@ -33,4 +34,10 @@ export async function findSimilarSkill(name: string, existing: string[]): Promis
 // Sends the question with the names of skills and levels. No person data leaves the browser.
 export function askMatrix(question: string, skills: string[], levels: string[]): Promise<QuestionAnswer> {
   return post("/api/ai/question", { question, skills, levels }, "ai.questionFailed");
+}
+
+// Asks which column of an import file holds which field. Only the column titles are sent.
+export async function matchImportColumns(headers: string[]): Promise<ColumnMap> {
+  const answer = await post<Record<ImportField, string | null>>("/api/ai/import-columns", { headers }, "ai.columnsNotMatched");
+  return columnsFromHeaders(answer, headers);
 }

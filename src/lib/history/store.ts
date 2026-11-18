@@ -2,13 +2,15 @@
 // has no database. It is kept per candidate namespace. If storage is not available, the
 // history is simply empty.
 import { CANDIDATE_ID } from "@/lib/candidate";
-import { markUndone, withChange, type Change } from "@/lib/domain/history";
+import { markUndone, withChange, withNewAssignment, type Change } from "@/lib/domain/history";
+import type { Assignment } from "@/lib/fsm/services/model";
 
 const KEY = `history:${CANDIDATE_ID}`;
 
 export function loadChanges(): Change[] {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    const stored: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    return Array.isArray(stored) ? stored : [];
   } catch {
     return [];
   }
@@ -20,10 +22,28 @@ function save(changes: Change[]) {
   } catch {}
 }
 
+// The history is a convenience. Recording must never fail a save that FSM has accepted.
 export function recordChange(change: Omit<Change, "id" | "at" | "undone">): void {
-  save(withChange(loadChanges(), { ...change, id: crypto.randomUUID(), at: new Date().toISOString(), undone: false }));
+  const at = new Date().toISOString();
+  save(withChange(loadChanges(), { ...change, id: `${at}-${Math.random()}`, at, undone: false }));
 }
 
-export function recordUndone(id: string): void {
-  save(markUndone(loadChanges(), id));
+export function recordAssigned(skillName: string, personName: string, assignment: Assignment): void {
+  recordChange({
+    kind: "assigned",
+    skillId: assignment.skillId,
+    skillName,
+    personId: assignment.personId,
+    personName,
+    assignmentId: assignment.id,
+    before: null,
+    after: { levelId: assignment.levelId, levelName: assignment.levelName, startDate: assignment.startDate, endDate: assignment.endDate },
+    lostCertificates: 0,
+  });
+}
+
+// An undone removal creates the assignment again, with a new id that the older entries need.
+export function recordUndone(change: Change, recreated: Assignment | null): void {
+  const changes = markUndone(loadChanges(), change.id);
+  save(recreated ? withNewAssignment(changes, change, recreated.id) : changes);
 }

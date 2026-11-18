@@ -8,6 +8,9 @@ import {
   AnalyticalTableHooks,
   Button,
   IllustratedMessage,
+  Label,
+  ObjectStatus,
+  Switch,
   Title,
   type AnalyticalTableCellInstance,
   type AnalyticalTableColumnDefinition,
@@ -15,6 +18,7 @@ import {
 import { AssignmentDialog } from "@/components/assignment/AssignmentDialog";
 import { BulkAssignDialog } from "@/components/assignment/BulkAssignDialog";
 import shell from "@/components/common/AppShell.module.css";
+import { ImportDialog } from "./ImportDialog";
 import { ExportButton } from "@/components/common/ExportDialog";
 import { LoadError, Loading } from "@/components/common/LoadState";
 import { useToast } from "@/components/common/useToast";
@@ -29,6 +33,8 @@ import {
   filterSkills,
   personPasses,
   skillsWithMatches,
+  sortRank,
+  summarize,
   type CellFilter,
 } from "@/lib/domain/matrix";
 import { matrixTable } from "@/lib/domain/export";
@@ -42,6 +48,20 @@ import { MatrixFilters } from "./MatrixFilters";
 import styles from "./SkillMatrix.module.css";
 
 const VISIBLE_ROWS = 15;
+const SUMMARY = [
+  { filter: "expired", state: "Negative" },
+  { filter: "expiring", state: "Critical" },
+  { filter: "noCertificate", state: "Information" },
+] as const;
+
+const COLUMN_ORDER_KEY = "matrix:columnOrder";
+function loadColumnOrder(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(COLUMN_ORDER_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
 
 // Keeps the person column in place while the skills scroll sideways. Despite its name this
 // is a table plugin factory, not a React hook, so it is created once outside the component.
@@ -58,6 +78,7 @@ export function SkillMatrix() {
   const [levels, setLevels] = useState<string[]>([]);
   const [selected, setSelected] = useState<{ person: Person; skill: Skill } | null>(null);
   const [assigningSeveral, setAssigningSeveral] = useState(false);
+  const [importing, setImporting] = useState(false);
   const { toastElement, showToast } = useToast();
   const aiEnabled = useAsyncData(isAiEnabled).data === true;
   const { t } = useI18n();
@@ -85,6 +106,15 @@ export function SkillMatrix() {
 
   const filters = useMemo(() => ({ statuses: statusFilters, levels }), [statusFilters, levels]);
 
+  // The order of the skill columns after dragging them, remembered in this browser.
+  const [columnOrder, setColumnOrder] = useState<string[]>(loadColumnOrder);
+  function saveColumnOrder(order: string[]) {
+    setColumnOrder(order);
+    try {
+      localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order));
+    } catch {}
+  }
+
   const searched = useMemo(() => filterPersons(data?.persons ?? [], search, showSystemUsers), [data, search, showSystemUsers]);
 
   const persons = useMemo(() => {
@@ -105,8 +135,10 @@ export function SkillMatrix() {
       {
         Header: t("field.person"),
         id: "person",
+        accessor: "displayName",
         sticky: "start",
         disableSticky: true,
+        disableDragAndDrop: true,
         width: 260,
         vAlign: "Middle",
         Cell: ({ row }: AnalyticalTableCellInstance) => {
@@ -122,8 +154,10 @@ export function SkillMatrix() {
       ...skills.map((skill): AnalyticalTableColumnDefinition => ({
         Header: skill.name,
         id: skill.id,
+        // Sorting a skill puts the problems first: expired, expiring soon, then the rest.
+        accessor: (person) => sortRank(cells.get(cellKey(person.id, skill.id))),
         disableSticky: true,
-        minWidth: 200,
+        minWidth: 220,
         vAlign: "Middle",
         Cell: ({ row }: AnalyticalTableCellInstance) => {
           const person = row.original as Person;
@@ -142,6 +176,12 @@ export function SkillMatrix() {
     [skills, cells, filters, t],
   );
 
+  // The overview counts every technician, whatever is filtered at the moment.
+  const summary = summarize(
+    (data?.persons ?? []).filter((person) => person.isTechnician).map((person) => person.id),
+    cells,
+  );
+
   if (!data) return error ? <LoadError message={error} onRetry={reload} /> : <Loading />;
 
   const selectedAssignment = selected ? cells.get(cellKey(selected.person.id, selected.skill.id))?.assignment : undefined;
@@ -155,6 +195,11 @@ export function SkillMatrix() {
           {data.skills.length > 0 && (
             <Button icon="add-employee" tooltip={t("matrix.assignSeveralTooltip")} onClick={() => setAssigningSeveral(true)}>
               {t("matrix.assignSeveral")}
+            </Button>
+          )}
+          {data.skills.length > 0 && (
+            <Button icon="upload" tooltip={t("import.tooltip")} onClick={() => setImporting(true)}>
+              {t("import.button")}
             </Button>
           )}
           <Button icon="refresh" tooltip={t("action.refreshTooltip")} disabled={loading} onClick={reload}>
@@ -189,24 +234,52 @@ export function SkillMatrix() {
             skillIds={skillIds}
             levels={levels}
             statusFilters={statusFilters}
-            showSystemUsers={showSystemUsers}
             onSearch={setSearch}
             onSkillIds={selectSkills}
             onLevels={setLevels}
             onStatusFilters={setStatusFilters}
-            onShowSystemUsers={setShowSystemUsers}
           />
 
           <AnalyticalTable
-            header={<Title level="H5">{t("matrix.persons", { count: persons.length })}</Title>}
+            header={
+              <div className={styles.summary}>
+                <Title level="H5">{t("matrix.persons", { count: persons.length })}</Title>
+                {SUMMARY.map(({ filter, state }) => (
+                  <ObjectStatus
+                    key={filter}
+                    state={summary[filter] > 0 ? state : "None"}
+                    interactive
+                    title={t("matrix.summaryHelp")}
+                    onClick={() => setStatusFilters([filter])}
+                  >
+                    {t(`matrix.summary.${filter}`, { count: summary[filter] })}
+                  </ObjectStatus>
+                ))}
+                <span className={styles.spacer} />
+                <span className={styles.inline}>
+                  <Switch
+                    id="system-users"
+                    tooltip={t("filter.systemUsersHelp")}
+                    accessibleNameRef="system-users-label"
+                    checked={showSystemUsers}
+                    onChange={(event) => setShowSystemUsers(event.target.checked)}
+                  />
+                  <Label id="system-users-label" for="system-users" onClick={() => setShowSystemUsers(!showSystemUsers)}>
+                    {t("filter.showSystemUsers")}
+                  </Label>
+                </span>
+              </div>
+            }
             columns={columns}
             data={persons}
             tableHooks={TABLE_HOOKS}
             loading={loading}
             visibleRows={VISIBLE_ROWS}
             minRows={1}
-            rowHeight={56}
-            sortable={false}
+            rowHeight={52}
+            sortable
+            columnOrder={columnOrder}
+            onColumnsReorder={(event) => saveColumnOrder(event.detail.columnsNewOrder.map((column) => String(column.id)))}
             filterable={false}
             groupable={false}
             noDataText={t("matrix.noPersons")}
@@ -237,6 +310,21 @@ export function SkillMatrix() {
           onClose={() => setAssigningSeveral(false)}
           onSaved={(message) => {
             setAssigningSeveral(false);
+            showToast(message);
+            reload();
+          }}
+          onChanged={reload}
+        />
+      )}
+      {importing && (
+        <ImportDialog
+          skills={data.skills}
+          persons={data.persons}
+          isAssigned={(personId, skillId) => cells.has(cellKey(personId, skillId))}
+          aiEnabled={aiEnabled}
+          onClose={() => setImporting(false)}
+          onSaved={(message) => {
+            setImporting(false);
             showToast(message);
             reload();
           }}

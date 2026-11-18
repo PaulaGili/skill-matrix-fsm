@@ -21,6 +21,13 @@
   border-radius: var(--sapElement_BorderCornerRadius);
 }
 
+/* A list with a few columns is easier to read when it does not stretch across a wide screen. */
+.narrow {
+  width: 100%;
+  max-width: 80rem;
+  margin: 0 auto;
+}
+
 .logo {
   width: 1.75rem;
   height: 1.75rem;

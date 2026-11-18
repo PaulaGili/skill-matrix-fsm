@@ -85,7 +85,7 @@ export function ExpiryList() {
   ];
 
   return (
-    <div className={shell.panel}>
+    <div className={`${shell.panel} ${shell.narrow}`}>
       <Bar
         design="Header"
         startContent={<Title level="H3">{t("expiry.title", { count: rows.length })}</Title>}

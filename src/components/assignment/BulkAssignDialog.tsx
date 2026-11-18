@@ -5,6 +5,7 @@ import { Bar, Button, Dialog, Label, MessageStrip, MultiComboBox, MultiComboBoxI
 import { toUserMessage } from "@/lib/fsm/errors";
 import { MAX_BULK_ASSIGNMENTS, createAssignments } from "@/lib/fsm/services/assignments";
 import type { Person, Skill } from "@/lib/fsm/services/model";
+import { recordAssigned } from "@/lib/history/store";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LevelField, ValidityFields, fieldsError, toInput, type FieldValues } from "./AssignmentFields";
 import styles from "./AssignmentDialog.module.css";
@@ -43,10 +44,13 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
     setBusy(true);
     setError(null);
     try {
-      await createAssignments(
+      const created = await createAssignments(
         skillId,
         personIds.map((personId) => ({ ...toInput(valuesOf(personId)), personId })),
       );
+      for (const assignment of created) {
+        recordAssigned(skill.name, persons.find((person) => person.id === assignment.personId)?.displayName ?? "", assignment);
+      }
       onSaved(t("bulk.assigned", { skill: skill.name, count: personIds.length }));
     } catch (e) {
       setError(toUserMessage(e, t));

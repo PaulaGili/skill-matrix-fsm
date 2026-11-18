@@ -34,6 +34,12 @@ export function markUndone(changes: Change[], id: string): Change[] {
   return changes.map((change) => (change.id === id ? { ...change, undone: true } : change));
 }
 
+// After a removal was undone, the entries of that person and skill point to the new assignment.
+export function withNewAssignment(changes: Change[], undone: Change, assignmentId: string): Change[] {
+  const same = (change: Change) => change.personId === undone.personId && change.skillId === undone.skillId;
+  return changes.map((change) => (same(change) ? { ...change, assignmentId } : change));
+}
+
 // Which values an edit changed, for the description in the list.
 export function changedFields(change: Change): ("level" | "validFrom" | "validTo")[] {
   const { before, after } = change;
