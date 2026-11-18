@@ -161,15 +161,7 @@ The full list, each with its reason, is in [docs/decisions.md](docs/decisions.md
 | Skills, scale, levels, assignments | Skill Service | The only API that knows the proficiency level |
 | Certificate files | Data API | The only one that handles attachment files |
 
-```mermaid
-flowchart LR
-  UI["Pages and dialogs<br/>UI5 Web Components"] --> S["Services<br/>src/lib/fsm/services"]
-  UI --> D["Rules<br/>src/lib/domain"]
-  S --> P["Proxy<br/>/api/fsm"]
-  P --> Q["Query API<br/>persons, certificate list"]
-  P --> K["Skill Service<br/>skills, levels, assignments"]
-  P --> A["Data API<br/>certificate files"]
-```
+![The layers: pages and dialogs call the services and the rules, the services call the proxy, and the proxy calls the three FSM APIs](docs/images/layers.png)
 
 Only the services know the FSM names. The rules (status, dates, filters, import) are pure functions without FSM or React, and that is where most of the unit tests are.
 
