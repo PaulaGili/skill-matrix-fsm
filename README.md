@@ -4,7 +4,7 @@ Hi, I'm Paula, and this is my solution to the [assessment](ASSIGNMENT.md).
 
 The app answers one question for a service manager: who has which skill, backed by which certificate, valid until when. Everything is read from and written to SAP FSM through the proxy you provided. There is no other database.
 
-It also has four small AI helpers. You can ask the matrix a question, and it reads the dates from a certificate for you. I did not just trust them: I measured them, 29 cases, five runs each. More in [The AI part](#the-ai-part).
+It also has five small AI helpers. You can ask the matrix a question, it reads the dates from a certificate for you, and it turns a pile of certificates into assignments that you only have to check. I did not just trust them: I measured them, 29 cases, five runs each. More in [The AI part](#the-ai-part).
 
 A hosted copy runs on Vercel. The link and the access code are in my email.
 
@@ -98,7 +98,7 @@ I also added a few things that I thought a real service manager would ask for ne
 
 - import of assignments from Excel or CSV, with every row checked before anything is saved,
 - a history of changes with undo,
-- four small AI helpers, and an evaluation that measures them,
+- five small AI helpers, and an evaluation that measures them,
 - a read-only MCP server, so an AI assistant can query the matrix.
 
 Further down I say what I would leave out if I started again.
@@ -118,7 +118,7 @@ Useful to know:
 
 | Command | What it does |
 |---|---|
-| `npm run gate` | Everything CI runs: types, lint, format, 144 unit tests, build, a check that no secret is in the browser files, 19 browser tests. Run `npx playwright install chromium` once before it. |
+| `npm run gate` | Everything CI runs: types, lint, format, 146 unit tests, build, a check that no secret is in the browser files, 20 browser tests. Run `npx playwright install chromium` once before it. |
 | `npm run seed` | Writes demo data to FSM in your namespace: 7 skills, 13 assignments, 5 certificates. |
 | `npm run cleanup -- --yes` | Deletes everything in your namespace. Without `--yes` it only lists it. |
 | `npm run smoke` | Runs the service layer against the real company with one throwaway skill. Needs the app running. |
@@ -168,7 +168,7 @@ Deleting everything is possible too. It takes one more step, and you have to typ
 
 The proxy limits which entities can be written, but it cannot know whose tag it is. So ownership is checked twice, in two different places.
 
-On the server, a small guard stands in front of the proxy and looks at every write before it is passed on. A tag or scale has to carry my prefix, and anything that is changed or deleted has to be something FSM lists in my namespace. The server reads those ids from FSM itself and trusts nothing the browser sent. A write that the app never makes is refused, and if FSM cannot be asked, nothing is written. Calling `/api/fsm` directly does not get around it.
+On the server, a small guard stands in front of the proxy and looks at every write before it is passed on. A tag or scale has to carry my prefix, and anything that is changed or deleted has to be something FSM lists in my namespace. The server reads those ids from FSM itself and trusts nothing the browser sent. An uploaded file has to be a PDF, JPG or PNG of up to 5 MB, here as well as in the browser. A write that the app never makes is refused, and if FSM cannot be asked, nothing is written. Calling `/api/fsm` directly does not get around it.
 
 In the browser, every update and delete reads the record back first. That is where the user gets a clear message, and where the app notices that someone else changed the record in the meantime.
 
@@ -201,25 +201,26 @@ I did not have a real service manager to ask. In a customer project that convers
 
 ## The AI part
 
-All four helpers follow the same rule: the AI makes a proposal and a person decides. Nothing the model answers is written to FSM.
+All five helpers follow the same rule: the AI makes a proposal and a person decides. Nothing the model answers is written to FSM.
 
 | Helper | What it does | What is sent |
 |---|---|---|
 | Read dates | Reads holder and validity dates from a certificate (PDF, JPG or PNG) | The file and the name of the skill, on a click |
 | Ask | Turns a question like "who can do welding?" into filters of the matrix | The question and the names of skills and levels, on a click |
 | Match columns | Finds the person and skill columns in a spreadsheet with unusual titles | The titles the code did not recognise, on a click |
+| Read certificates | Reads up to ten certificates and proposes one assignment for each, with the file attached | Each file and the names of the skills, on a click |
 | Similar skill | Warns when a new skill means the same as an existing one | The new name and the names in the catalogue, when a skill is created |
 
 How it is built:
 
-- All four go through one function on the server, using the Anthropic SDK and the model `claude-haiku-5-5`.
+- All five go through one function on the server, using the Anthropic SDK and the model `claude-haiku-5-5`.
 - The answer is requested as structured output against a zod schema, so its shape is guaranteed by the API and nothing is parsed from free text.
-- The code then checks the content: a skill or level that does not exist is dropped, dates must be real dates in the right order, a column title must be one of the titles in the file.
+- The code then checks the content: a skill or level that does not exist is dropped, dates must be real dates in the right order, a column title must be one of the titles in the file, and a name read from a certificate must be exactly one technician.
 - Each call has a time limit of 25 seconds, and there is a cap on calls per hour.
 - The key stays on the server. Without it the helpers are simply not shown.
 - Every prompt says that the input is data, and each helper has a test case that tries to give the model an instruction.
 
-Persons and assignments from FSM are never sent. The certificate is the one case with personal data, so under the GDPR and the Swiss FADP a real installation needs a data processing agreement with the provider, and a word to the technicians, before "Read dates" is switched on.
+Persons and assignments from FSM are never sent. A certificate is the one case with personal data, so under the GDPR and the Swiss FADP a real installation needs a data processing agreement with the provider, and a word to the technicians, before "Read dates" and "Read certificates" are switched on.
 
 ### Measuring it
 
@@ -229,6 +230,8 @@ Running it several times showed me two things I had not expected:
 
 - Two cases passed in one run and failed in the next, with the same model: the column title "MA", and a question that asks for a status and a missing certificate at once. I made both prompts clearer and added control cases with wording the prompt does not mention, to see that the fix is general.
 - I had started with the strong model for certificates, assuming a scan needs it. Then I compared both on seven certificates, two of them made to look like phone photos. Same answers, 1.4 instead of 1.9 seconds, at a fraction of the cost. So the app now uses one small model. The two runs are in [tests/ai-eval/model-comparison.txt](tests/ai-eval/model-comparison.txt).
+
+The newest helper, reading certificates for the import, has seven cases of its own, one of them a licence for a skill that is not in the catalogue. They were added after that run, so the file does not show them yet.
 
 To be fair, the cases are few and I made them myself. I know the prompts work on these inputs. I do not know yet how they do on every scan a technician will upload.
 
@@ -254,8 +257,8 @@ It hands the names and skills of the technicians to whichever assistant is conne
 
 ## Tests and CI
 
-- 144 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
-- 19 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
+- 146 unit tests on the pure rules: statuses and dates, filters, import, export, the ownership checks in the browser and on the server, and the access code.
+- 20 browser tests against the production build with FSM mocked in the browser, so they need no credentials and never touch the shared company. They walk through the required scope: catalogue, assigning, editing, certificates.
 - A smoke test against the real company for the things only FSM can answer.
 - GitHub Actions runs `npm run gate` on every pull request, the same command as on my machine.
 
@@ -265,7 +268,7 @@ It hands the names and skills of the technicians to whichever assistant is conne
 |---|---|
 | `zod` | Checks what comes into the AI routes and describes the answer the model has to give |
 | `read-excel-file`, `write-excel-file` | Import and export of real .xlsx files in the browser, small and without a server step |
-| `@anthropic-ai/sdk` | The four AI helpers |
+| `@anthropic-ai/sdk` | The five AI helpers |
 | `@modelcontextprotocol/sdk` | The MCP server |
 | `vitest`, `@playwright/test` | Unit and browser tests |
 | `prettier`, `tsx` | One code format, and running the TypeScript scripts |

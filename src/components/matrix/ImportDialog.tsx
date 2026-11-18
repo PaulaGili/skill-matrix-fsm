@@ -17,15 +17,33 @@ import {
   Text,
 } from "@ui5/webcomponents-react";
 import { useAsyncData } from "@/hooks/useAsyncData";
-import { matchImportColumns } from "@/lib/ai/client";
-import { IMPORT_FIELDS, MAX_IMPORT_ROWS, guessColumns, isEmptyRow, toImportRows, unusedColumns, withProposed, type ColumnMap } from "@/lib/domain/import";
+import { matchImportColumns, readCertificateForImport } from "@/lib/ai/client";
+import { CERTIFICATE_ACCEPT, checkCertificateFile } from "@/lib/domain/certificate";
+import {
+  CERTIFICATE_COLUMNS,
+  IMPORT_FIELDS,
+  MAX_IMPORT_CERTIFICATES,
+  MAX_IMPORT_ROWS,
+  certificateRows,
+  guessColumns,
+  isEmptyRow,
+  toImportRows,
+  unusedColumns,
+  withProposed,
+  type CertificateRead,
+  type ColumnMap,
+  type ImportRow,
+} from "@/lib/domain/import";
 import { formatDate } from "@/lib/domain/status";
+import { fileToBase64 } from "@/lib/fsm/client";
 import { toUserMessage } from "@/lib/fsm/errors";
 import { createAssignments } from "@/lib/fsm/services/assignments";
+import { uploadToChecked } from "@/lib/fsm/services/certificates";
 import type { Level, Person, Skill } from "@/lib/fsm/services/model";
 import { listLevels } from "@/lib/fsm/services/scale";
 import { recordAssigned } from "@/lib/history/store";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { UserError, type Message } from "@/lib/i18n/translate";
 import { SortButton, useSort, type SortColumn } from "@/components/common/useSort";
 import { readRows } from "./readRows";
 import styles from "./ImportDialog.module.css";
@@ -46,6 +64,8 @@ interface Sheet {
   columns: ColumnMap;
   askedAi: boolean;
   byAi: boolean; // the AI filled at least one field
+  // When the rows were read from certificates: the file of each row, and why it was not read.
+  certificates?: { file: File; problem: Message | null }[];
 }
 
 const SORT_COLUMNS: SortColumn[] = [
@@ -58,13 +78,22 @@ const SORT_COLUMNS: SortColumn[] = [
   { key: "result", label: "import.result" },
 ];
 
-// Creates assignments from a file. Every row is shown first with what it would create or why
-// it cannot be imported, and only the ticked rows are saved.
+// What a row from a certificate says first: the file was not read, or no name or no skill was found on it.
+function certificateProblem(certificate: { problem: Message | null } | undefined, row: ImportRow): Message | null {
+  if (!certificate) return null;
+  if (certificate.problem) return certificate.problem;
+  if (row.personText === "") return { key: "import.noHolder" };
+  return row.skillText === "" ? { key: "import.noSkillFound" } : null;
+}
+
+// Creates assignments from a file, or from certificates that the AI reads. Every row is shown
+// first with what it would create or why it cannot be imported, and only the ticked rows are saved.
 export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, onSaved, onChanged }: Props) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [skipped, setSkipped] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState<string | null>(null);
   const { t } = useI18n();
   const sort = useSort();
 
@@ -76,7 +105,9 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
   const { data: levels, error: levelsError } = useAsyncData(loadLevels);
 
   const ready = sheet !== null && sheet.columns.person !== null && sheet.columns.skill !== null;
-  const rows = ready && levels ? toImportRows(sheet.rows, sheet.columns, { persons, skills, levels, isAssigned }) : [];
+  const checked = ready && levels ? toImportRows(sheet.rows, sheet.columns, { persons, skills, levels, isAssigned }) : [];
+  const fileOf = (line: number) => sheet?.certificates?.[line - 2];
+  const rows = checked.map((row) => ({ ...row, problem: certificateProblem(fileOf(row.line), row) ?? row.problem }));
   const chosen = rows.filter((row) => !row.problem && !skipped.includes(row.line));
   const allLevels = Object.values(levels ?? {}).flat();
   const levelName = (levelId: string | null) => allLevels.find((level) => level.id === levelId)?.name ?? "";
@@ -109,6 +140,35 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
     setBusy(false);
   }
 
+  // Only on a click: each chosen certificate goes to the AI with the names of the skills. What
+  // it reads becomes a row and passes the same checks as a row of a file.
+  async function readCertificates(files: File[]) {
+    if (files.length === 0) return;
+    setError(null);
+    setSheet(null);
+    setSkipped([]);
+    if (files.length > MAX_IMPORT_CERTIFICATES) return setError(t("import.tooManyCertificates", { count: files.length, max: MAX_IMPORT_CERTIFICATES }));
+    setBusy(true);
+    const names = skills.map((skill) => skill.name);
+    const reads: CertificateRead[] = [];
+    const certificates: NonNullable<Sheet["certificates"]> = [];
+    for (const [index, file] of files.entries()) {
+      setReading(t("import.reading", { done: index + 1, count: files.length }));
+      const empty = { fileName: file.name, holderName: null, skill: null, validFrom: null, validTo: null };
+      const check = checkCertificateFile(file.name, file.size);
+      try {
+        reads.push(check.ok ? await readCertificateForImport(file, names) : empty);
+        certificates.push({ file, problem: check.ok ? null : check.error });
+      } catch (e) {
+        reads.push(empty);
+        certificates.push({ file, problem: e instanceof UserError ? { key: e.key, params: e.params } : { key: "ai.certificateNotRead" } });
+      }
+    }
+    setSheet({ headers: [], rows: certificateRows(reads), columns: CERTIFICATE_COLUMNS, askedAi: true, byAi: false, certificates });
+    setReading(null);
+    setBusy(false);
+  }
+
   // Only on a click: the titles the code did not recognise go to the AI, which fills the
   // fields that are still open. The rows below the first one stay in the browser.
   async function matchWithAi(sheet: Sheet) {
@@ -133,11 +193,22 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
       const created = await createAssignments(
         chosen.map((row) => ({ skillId: row.skillId!, personId: row.personId!, levelId: row.levelId, startDate: row.startDate, endDate: row.endDate })),
       );
+      const notAttached: string[] = [];
       for (const assignment of created) {
         const skill = skills.find((s) => s.id === assignment.skillId)?.name ?? "";
         recordAssigned(skill, persons.find((person) => person.id === assignment.personId)?.displayName ?? "", assignment);
+        // A row that came from a certificate gets its file.
+        const row = chosen.find((r) => r.personId === assignment.personId && r.skillId === assignment.skillId);
+        const file = row && fileOf(row.line)?.file;
+        if (!file) continue;
+        const upload = { fileName: file.name, sizeBytes: file.size, base64: await fileToBase64(file) };
+        if ((await uploadToChecked(assignment.id, [upload])).length > 0) notAttached.push(file.name);
       }
-      onSaved(t("import.done", { count: created.length }));
+      if (notAttached.length === 0) return onSaved(t("import.done", { count: created.length }));
+      setError(t("import.notAttached", { files: notAttached.join(", ") }));
+      setSheet(null);
+      setBusy(false);
+      onChanged();
     } catch (e) {
       setError(toUserMessage(e, t));
       setBusy(false);
@@ -145,7 +216,7 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
     }
   }
 
-  const notUsed = sheet ? unusedColumns(sheet.headers, sheet.columns).map((column) => sheet.headers[column]) : [];
+  const notUsed = sheet && !sheet.certificates ? unusedColumns(sheet.headers, sheet.columns).map((column) => sheet.headers[column]) : [];
   const canAskAi = aiEnabled && sheet !== null && !sheet.askedAi && notUsed.length > 0 && Object.values(sheet.columns).includes(null);
   const usedColumns = sheet
     ? IMPORT_FIELDS.filter((field) => sheet.columns[field] !== null)
@@ -176,7 +247,9 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
       }
     >
       <div className={styles.content}>
-        <Text>{t("import.intro", { max: MAX_IMPORT_ROWS })}</Text>
+        <Text>
+          {t("import.intro", { max: MAX_IMPORT_ROWS })} {aiEnabled && t("import.introCertificates", { max: MAX_IMPORT_CERTIFICATES })}
+        </Text>
         {levelsError && (
           <MessageStrip design="Negative" hideCloseButton>
             {levelsError}
@@ -187,11 +260,27 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
             {error}
           </MessageStrip>
         )}
-        <FileUploader hideInput accept=".xlsx,.csv" disabled={busy || !levels} onChange={(event) => choose(event.detail.files?.[0])}>
-          <Button icon="upload" disabled={busy || !levels}>
-            {t("import.chooseFile")}
-          </Button>
-        </FileUploader>
+        <div className={styles.actions}>
+          <FileUploader hideInput accept=".xlsx,.csv" disabled={busy || !levels} onChange={(event) => choose(event.detail.files?.[0])}>
+            <Button icon="upload" disabled={busy || !levels}>
+              {t("import.chooseFile")}
+            </Button>
+          </FileUploader>
+          {aiEnabled && (
+            <FileUploader
+              hideInput
+              multiple
+              accept={CERTIFICATE_ACCEPT}
+              disabled={busy || !levels}
+              onChange={(event) => readCertificates([...(event.detail.files ?? [])])}
+            >
+              <Button icon="ai" disabled={busy || !levels} tooltip={t("import.readCertificatesHelp")}>
+                {t("import.readCertificates")}
+              </Button>
+            </FileUploader>
+          )}
+        </div>
+        {reading && <Text>{reading}</Text>}
 
         {sheet && !ready && (
           <MessageStrip design="Negative" hideCloseButton>
@@ -203,11 +292,11 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
             {t("import.matchWithAi")}
           </Button>
         )}
-        {sheet && sheet.askedAi && !sheet.byAi && <Text>{t("import.aiFoundNothing")}</Text>}
+        {sheet && sheet.askedAi && !sheet.byAi && !sheet.certificates && <Text>{t("import.aiFoundNothing")}</Text>}
         {sheet && ready && (
           <>
             <Text>
-              {t("import.columns", { columns: usedColumns })} {sheet.byAi && t("import.columnsByAi")}
+              {sheet.certificates ? t("import.fromCertificates") : t("import.columns", { columns: usedColumns })} {sheet.byAi && t("import.columnsByAi")}
             </Text>
             {notUsed.length > 0 && (
               <MessageStrip design="Critical" hideCloseButton>
@@ -221,8 +310,8 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
               headerRow={
                 <TableHeaderRow>
                   <TableHeaderCell width="3rem" />
-                  <TableHeaderCell width="4rem" sortIndicator={sort.indicator("line")}>
-                    {t("import.row")}
+                  <TableHeaderCell width={sheet.certificates ? "10rem" : "4rem"} sortIndicator={sort.indicator("line")}>
+                    {t(sheet.certificates ? "import.file" : "import.row")}
                   </TableHeaderCell>
                   <TableHeaderCell minWidth="10rem" sortIndicator={sort.indicator("person")}>
                     {t("field.person")}
@@ -256,7 +345,7 @@ export function ImportDialog({ skills, persons, isAssigned, aiEnabled, onClose, 
                     />
                   </TableCell>
                   <TableCell>
-                    <Text>{row.line}</Text>
+                    <Text>{fileOf(row.line)?.file.name ?? row.line}</Text>
                   </TableCell>
                   <TableCell>
                     <Text>{row.personText}</Text>

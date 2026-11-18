@@ -9,6 +9,14 @@ const own: OwnData = {
   scaleIds: async () => new Set(["S1"]),
 };
 const check = (method: string, path: string, body: unknown = null) => writeRefusal(method, path.split("/"), body, own);
+// A certificate as the app uploads it, on our assignment A1.
+const upload = (changes: object = {}) => ({
+  fileName: "a.pdf",
+  type: "PDF",
+  fileContent: "JVBERi0=",
+  object: { objectId: "A1", objectType: "SKILL" },
+  ...changes,
+});
 
 describe("isRead", () => {
   it("lets the reads pass, also those sent as POST", () => {
@@ -31,7 +39,7 @@ describe("writeRefusal", () => {
     expect(await check("PATCH", "skill/v1/tags/T1/skills/A1", { proficiencyId: null })).toBeNull();
     expect(await check("POST", "skill/v1/scales", { name: "tester::Levels", proficiencies: [] })).toBeNull();
     expect(await check("DELETE", "skill/v2/scales", { id: "S1" })).toBeNull();
-    expect(await check("POST", "data/v4/Attachment", { fileName: "a.pdf", object: { objectId: "A1", objectType: "SKILL" } })).toBeNull();
+    expect(await check("POST", "data/v4/Attachment", upload())).toBeNull();
     expect(await check("DELETE", "data/v4/Attachment/C1")).toBeNull();
   });
 
@@ -60,6 +68,19 @@ describe("writeRefusal", () => {
     expect(await check("POST", "data/v4/Attachment", { object: { objectId: "A1", objectType: "PERSON" } })).toMatch(/outside the namespace/);
     expect(await check("POST", "data/v4/Attachment", { fileName: "a.pdf" })).toMatch(/outside the namespace/);
     expect(await check("DELETE", "data/v4/Attachment/C9")).toMatch(/outside the namespace/);
+  });
+
+  it("refuses a file that is no certificate, also on our own assignment", async () => {
+    const refused = /PDF, JPG or PNG/;
+    expect(await check("POST", "data/v4/Attachment", upload({ fileName: "a.jpg", type: "JPEG" }))).toBeNull();
+    expect(await check("POST", "data/v4/Attachment", upload({ fileName: "a.exe" }))).toMatch(refused);
+    expect(await check("POST", "data/v4/Attachment", upload({ fileName: "a.pdf", type: "HTML" }))).toMatch(refused);
+    expect(await check("POST", "data/v4/Attachment", upload({ fileContent: "" }))).toMatch(refused);
+    expect(await check("POST", "data/v4/Attachment", upload({ fileContent: undefined }))).toMatch(refused);
+    // 5 MB pass, one byte more does not.
+    const base64 = (bytes: number) => "A".repeat(Math.ceil((bytes * 4) / 3));
+    expect(await check("POST", "data/v4/Attachment", upload({ fileContent: base64(5 * 1024 * 1024) }))).toBeNull();
+    expect(await check("POST", "data/v4/Attachment", upload({ fileContent: base64(5 * 1024 * 1024 + 3) }))).toMatch(refused);
   });
 
   it("refuses every write the app does not make, and a body it cannot read", async () => {

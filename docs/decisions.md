@@ -26,7 +26,7 @@ The app uses the words of the assignment: Skill (FSM Tag), Assignment (FSM Skill
 
 The proxy of the assessment limits which entities can be written, but it cannot know whose tag it is. Ownership is therefore checked in two places.
 
-- On the server, in front of the proxy (`src/proxy.ts`, `src/lib/fsm/write-guard.ts`). Every write to FSM is inspected before it is passed on: a tag or scale must carry our prefix, and a tag, skill, scale or attachment that is changed or deleted must be one that FSM lists in our namespace. For that the server reads our ids from FSM itself, with one to three list calls per write, and trusts nothing the browser sent. A write the app does not make at all is refused. If FSM cannot be asked, nothing is written. This check cannot be skipped by calling `/api/fsm` directly.
+- On the server, in front of the proxy (`src/proxy.ts`, `src/lib/fsm/write-guard.ts`). Every write to FSM is inspected before it is passed on: a tag or scale must carry our prefix, and a tag, skill, scale or attachment that is changed or deleted must be one that FSM lists in our namespace. For that the server reads our ids from FSM itself, with one to three list calls per write, and trusts nothing the browser sent. A certificate must also pass the file rules: PDF, JPG or PNG, up to 5 MB. A write the app does not make at all is refused. If FSM cannot be asked, nothing is written. This check cannot be skipped by calling `/api/fsm` directly.
 - In the browser, in the services. Every update and delete takes an id, reads the record back from FSM and checks it before writing. This is what gives the user a clear message in the right language, and it notices a change someone else made in the meantime.
 
 The first version had only the check in the browser, with the access code in front of a hosted copy. A review pointed out that the browser is the wrong place to enforce a rule, so the server check was added. The price is the extra reads on every write; reads are not affected.
@@ -52,7 +52,7 @@ Deleting a skill in the catalogue:
 - Save writes in a fixed order: the assignment, certificates to delete, then new files. The assignment goes first because that step reads it back from FSM and refuses a change someone else made in the meantime; if it is refused, no certificate has been touched. What fails after it (a certificate that cannot be deleted, a file that cannot be uploaded) is shown next to the saved assignment: the dialog stays open, names the file and the reason, and Save can be pressed again. An earlier version deleted the certificates first, and a refused update then left a certificate deleted with nothing to show for it; a review of the change found that.
 - "Assign to several" gives one skill to several persons in one request, with the same level and either the same validity for everyone or dates per person. It only offers persons who do not have the skill yet and stops at 20 persons, because the shared company allows no bulk imports beyond a few dozen records.
 - A file travels as base64 inside a JSON request, a third larger than the file. Locally the 5 MB limit holds. A hosting platform can cut the request earlier: Vercel does at 4.5 MB, so a hosted copy takes files up to about 3 MB and says so when one is larger. Uploading in parts or straight to FSM would lift this; it was not worth the extra code here.
-- Files are checked twice: when they are picked (type and 5 MB limit) and again in the service before upload.
+- Files are checked three times: when they are picked (type and 5 MB limit), again in the service before upload, and on the server, so a request that skips the app cannot put another kind of file on one of our assignments.
 - A certificate opens in a viewer dialog, the same one from the assignment, the person view, the skill view and the expiry list. FSM serves attachments as downloads, so the file is fetched and shown from memory instead of pointing an iframe at the URL.
 - FSM silently ignores a new end date on an open-ended skill (it answers 200 and keeps `9999-12-31`) unless `validityType` changes with it: `LF` for a date range, `PE` for no end date. `updateAssignment` always sends both. The smoke test covers a date range becoming open-ended through `updateAssignment`, and open-ended becoming a date range through the bulk route that retire uses.
 
@@ -107,23 +107,24 @@ Every active person exists twice in the demo company, once as `EMPLOYEE` and onc
 - The person decides. The result is a proposal in the dialog; "Use these dates" fills the form, and nothing is written to FSM before Save.
 - The certificate is also checked against what is stored: a note appears when the AI says it is clearly for another skill, or when a date printed on it differs from the date of the assignment. Only a date that is on the certificate is compared.
 - When a skill is created, the AI is asked once whether the catalogue already has one that means the same (a translation or another word). Only skill names are sent, an answer counts only if that skill exists, and the user can still create the skill.
-- One small model runs all four features. The first version read certificates with the strong model, on the assumption that a scan needs it. The evaluation then compared the two on seven certificates, two of them made to look like phone photos, five times each: the same answers from both, 1.4 s per file instead of 1.9 s, at a fraction of the cost. The two runs are in `tests/ai-eval/model-comparison.txt`. So the strong model went. If real scans turn out harder than these, the comparison is one command away.
+- One small model runs all five features. The first version read certificates with the strong model, on the assumption that a scan needs it. The evaluation then compared the two on seven certificates, two of them made to look like phone photos, five times each: the same answers from both, 1.4 s per file instead of 1.9 s, at a fraction of the cost. The two runs are in `tests/ai-eval/model-comparison.txt`. So the strong model went. If real scans turn out harder than these, the comparison is one command away.
 - The key stays on the server, like the FSM secret. The bundle check looks for it in the browser files on a machine that has the key; in CI there is no key to look for. The file is only sent when the user clicks the button, and there is a cap on reads per hour. The cap is one counter for all AI features, kept in memory per server, and the AI routes do not ask who is calling, so a hosted copy needs an access code in front of it.
 - The answer is requested as structured output, so its shape is guaranteed by the API and not parsed from free text.
 - Whether it reads correctly is measured, not assumed: see "Evaluating the AI features" below.
 
 ## What the AI features send
 
-All four are off without `ANTHROPIC_API_KEY`. With it, data goes to the Anthropic API, a company in the United States. The app itself keeps none of it.
+All five are off without `ANTHROPIC_API_KEY`. With it, data goes to the Anthropic API, a company in the United States. The app itself keeps none of it.
 
-| Feature       | What is sent                                                                                | When                    |
-| ------------- | ------------------------------------------------------------------------------------------- | ----------------------- |
-| Read dates    | The whole certificate file and the name of the skill. A certificate names its holder.       | On a click              |
-| Ask           | The question and the names of skills and levels. A person's name only if the user types it. | On a click              |
-| Match columns | The titles of the first row that the code did not recognise                                 | On a click              |
-| Similar skill | The new skill name and the names in the catalogue                                           | When a skill is created |
+| Feature           | What is sent                                                                                | When                    |
+| ----------------- | ------------------------------------------------------------------------------------------- | ----------------------- |
+| Read dates        | The whole certificate file and the name of the skill. A certificate names its holder.       | On a click              |
+| Ask               | The question and the names of skills and levels. A person's name only if the user types it. | On a click              |
+| Match columns     | The titles of the first row that the code did not recognise                                 | On a click              |
+| Read certificates | Each chosen certificate file and the names of the skills in the catalogue                   | On a click              |
+| Similar skill     | The new skill name and the names in the catalogue                                           | When a skill is created |
 
-Persons and assignments from FSM are never sent. The certificate is the one case with personal data, so a real installation needs a data processing agreement with the provider and a note for the technicians before this is switched on (GDPR, Swiss FADP). The MCP server is different: it hands the matrix to whichever assistant the user connects, which is that user's decision.
+Persons and assignments from FSM are never sent. A certificate is the one case with personal data, so a real installation needs a data processing agreement with the provider and a note for the technicians before this is switched on (GDPR, Swiss FADP). The MCP server is different: it hands the matrix to whichever assistant the user connects, which is that user's decision.
 
 ## Asking the matrix a question
 
@@ -148,6 +149,7 @@ Persons and assignments from FSM are never sent. The certificate is the one case
 - A second argument reads the certificates with another model (`npm run eval:ai -- 5 claude-opus-5-5`). That comparison is why the app uses one small model: see "Reading a certificate with AI".
 - Repeating found two cases that passed in one run and failed in the next, with the same model: the column title "MA", and a question that asks for a status and a missing certificate at once. Both prompts were made clearer, and each got control cases with wording the prompt does not mention, to check that the fix is general and not fitted to the one case.
 - Last run: 29 of 29 cases right in all five runs, between 1.2 and 1.6 seconds per call. Before the two prompt fixes, the question that asks for a status and a missing certificate was right in 3 of 5 runs, twice in a row.
+- The import from certificates has seven cases of its own (`tests/ai-eval/import-certificates.json`): the holder, both dates and the skill of the catalogue must match, and for a licence that fits no skill the answer must be none. They were added after the last run and are not in `last-run.txt` yet.
 - Limits: the cases are few. Seven files, two of them made to look like phone photos, do not show how it copes with real scans, and 100 % here says the prompts work on these inputs, not on all.
 
 ## Importing assignments from a file
@@ -157,6 +159,19 @@ Assignments can be created from an Excel or CSV file, up to 20 rows, the same li
 The usual column titles in English and German are recognised by code. If titles are left over, a "Match columns with AI" button sends them, and nothing else, to the AI, which answers with the title for each field that is still open. An answer that is not one of the titles in the file is dropped, and a column that no field uses is named in a warning above the rows. Nothing is sent without that click. The first row counts as the titles, so in a file without a title row the click sends the first data row; every other row stays in the browser.
 
 The import writes all rows in one request through the same service as the dialogs, so the namespace check and the duplicate check apply. Saving 20 rows costs three calls (skills, assignments, create), plus one for each row without a level. FSM answers per row: if one row fails, the request counts as failed, the matrix reloads, and the rows that were saved show as already assigned, without an entry in the history. If the request fails, the matrix reloads and shows what FSM saved.
+
+## Importing from certificates
+
+A training centre sends its certificates as files, one per person. Typing them in means one dialog per file. With the AI key set, the import therefore has a second button, "Read certificates with AI", for up to ten files.
+
+- The AI reads one certificate at a time: the holder, the two dates, and which skill of the catalogue it is for. It gets the file and the names of the skills. It gets no persons, so it cannot pick one.
+- What it read becomes a row of the same preview as a file import and passes the same code: the name must be exactly one technician, the skill must be in the catalogue, the dates must be real and in order, and the person must not have the skill yet. A skill name that is not in the catalogue is dropped before that, whatever the AI answered.
+- A row says why it is not ready: the file could not be read, no name was found, no skill fits, no technician has this name. A name with a title or a middle name does not match and is left to the user, which is the safe side.
+- The user sees every row and unticks what should not be saved. Nothing is written before that click.
+- The assignments are created in one request, like any import, and each file is then attached to its assignment. A file that cannot be attached is named, and the assignment stays.
+- The level is not on a certificate, so these assignments get no level.
+
+This is the same rule as everywhere: the AI proposes, the code checks, the person decides. It is a separate prompt from "Read dates", where the skill is already known and the question is only whether the certificate fits it.
 
 ## Demo mode
 

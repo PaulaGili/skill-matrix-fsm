@@ -4,7 +4,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { matchColumns } from "@/lib/ai/import-columns";
 import { questionToAnswer } from "@/lib/ai/question";
-import { readCertificate } from "@/lib/ai/read-certificate";
+import { readCertificate, readCertificateForImport } from "@/lib/ai/read-certificate";
 import { MODEL } from "@/lib/ai/server";
 import { similarSkill } from "@/lib/ai/similar-skill";
 import { checkCertificateFile } from "@/lib/domain/certificate";
@@ -78,6 +78,21 @@ async function certificateProblems(expected: Certificate): Promise<string[]> {
   return (["holderName", "validFrom", "validTo", "forSkill"] as const).flatMap((field) => differs(field, expected[field], facts[field]));
 }
 
+// For the import the catalogue is given, and the certificate may fit none of its skills.
+type ImportCertificate = Omit<Certificate, "skill" | "forSkill"> & { skill: string | null };
+
+// What the import would put into the row: holder, dates, and a skill only when it is in the catalogue.
+async function importProblems(expected: ImportCertificate): Promise<string[]> {
+  const file = readFileSync(`tests/ai-eval/cases/${expected.file}`);
+  const check = checkCertificateFile(expected.file, file.length);
+  if (!check.ok) return [check.error.key];
+  const read = await readCertificateForImport(check.type, file.toString("base64"), SKILL_NAMES);
+  return [
+    ...(["holderName", "validFrom", "validTo"] as const).flatMap((field) => differs(field, expected[field], read[field])),
+    ...differs("skill", expected.skill, existingSkill(read.skill, SKILL_NAMES)),
+  ];
+}
+
 interface Question {
   question: string;
   search?: string; // part of a person's name the search must hold; without it the search must stay empty
@@ -131,6 +146,7 @@ async function main() {
 
   const results = [
     await score("Certificates", load<Certificate>("expected.json"), (c) => `${c.file} for ${c.skill}`, certificateProblems),
+    await score("Certificates for the import", load<ImportCertificate>("import-certificates.json"), (c) => c.file, importProblems),
     await score("Questions about the matrix", load<Question>("questions.json"), (c) => `"${c.question}"`, questionProblems),
     await score("Similar skill names", load<{ name: string; similar: string | null }>("similar-skills.json"), (c) => `"${c.name}"`, similarProblems),
     await score("Column titles of an import file", load<Sheet>("import-columns.json"), (c) => c.headers.join(", "), columnProblems),
