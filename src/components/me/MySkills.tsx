@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FilterGroupItem, Option, Select } from "@ui5/webcomponents-react";
+import { ComboBox, ComboBoxItem, FilterGroupItem } from "@ui5/webcomponents-react";
 import { PageFilters } from "@/components/common/Filters";
 import shell from "@/components/common/AppShell.module.css";
 import { LoadError, Loading } from "@/components/common/LoadState";
@@ -45,7 +45,7 @@ export function MySkills() {
       <AssignmentsTable
         exportName="my-skills"
         title={t("me.title", { count: rows.length })}
-        emptyText={me ? t("person.none") : t("me.choose")}
+        emptyText={me ? t("person.none") : t("me.chooseText")}
         firstColumn="field.skill"
         rows={rows}
         certificates={data.certificates}
@@ -54,16 +54,26 @@ export function MySkills() {
         filters={
           <PageFilters>
             <FilterGroupItem filterKey="person" label={t("field.person")} className={shell.filterItem}>
-              <Select id="me-person" accessibleName={t("me.choose")} onChange={(event) => choose(event.detail.selectedOption.dataset.id ?? "")}>
-                <Option data-id="" selected={!me}>
-                  {t("me.choose")}
-                </Option>
+              {/* Typing narrows the list, which matters with many technicians. A pick from the list
+                  gives the id. A name that was typed in full is looked up, and an empty field clears. */}
+              <ComboBox
+                id="me-person"
+                placeholder={t("me.choose")}
+                accessibleName={t("me.choose")}
+                filter="Contains"
+                showClearIcon
+                value={me?.displayName ?? ""}
+                onSelectionChange={(event) => choose(event.detail.item?.dataset.id ?? "")}
+                onChange={(event) => {
+                  const typed = event.target.value.trim().toLowerCase();
+                  if (typed !== (me?.displayName ?? "").toLowerCase())
+                    choose(technicians.find((person) => person.displayName.toLowerCase() === typed)?.id ?? "");
+                }}
+              >
                 {technicians.map((person) => (
-                  <Option key={person.id} data-id={person.id} selected={person.id === me?.id}>
-                    {person.displayName}
-                  </Option>
+                  <ComboBoxItem key={person.id} text={person.displayName} data-id={person.id} />
                 ))}
-              </Select>
+              </ComboBox>
             </FilterGroupItem>
           </PageFilters>
         }
