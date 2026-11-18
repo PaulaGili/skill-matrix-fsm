@@ -7,7 +7,8 @@ export const en = {
   "nav.expiry": "Expiring",
   "nav.history": "Changes",
   "nav.me": "My skills",
-  "me.choose": "Choose your name",
+  "me.choose": "Type or choose your name",
+  "me.chooseText": "Choose your name above to see your skills.",
   "me.title": "My skills ({count})",
   "expiry.period": "Period",
 

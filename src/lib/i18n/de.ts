@@ -8,7 +8,8 @@ export const de: Dictionary = {
   "nav.expiry": "Ablaufend",
   "nav.history": "Änderungen",
   "nav.me": "Meine Qualifikationen",
-  "me.choose": "Namen wählen",
+  "me.choose": "Namen eingeben oder wählen",
+  "me.chooseText": "Wählen Sie oben Ihren Namen, um Ihre Qualifikationen zu sehen.",
   "me.title": "Meine Qualifikationen ({count})",
   "expiry.period": "Zeitraum",
 

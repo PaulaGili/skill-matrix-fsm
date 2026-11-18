@@ -274,19 +274,22 @@ test("a technician picks the own name and sees the own skills, and the choice is
   await page.goto("/me");
   await expect(page.getByText("My skills (0)")).toBeVisible();
 
-  // The first name of the list as well: a choice must be kept whichever it is.
-  await page.locator("#me-person").click();
+  // Typing narrows the list. The first name of the list as well: a choice must be kept whichever it is.
+  const name = page.locator("#me-person input");
+  await name.pressSequentially("aer");
   await page.getByRole("option", { name: "Aerni, Anna" }).click();
   await expect(page.getByText("My skills (1)")).toBeVisible();
   await expect(page.getByText("welding.pdf")).toBeVisible();
 
-  await page.locator("#me-person").click();
-  await page.getByRole("option", { name: "Baumann, Beat" }).click();
-  await expect(page.getByText("My skills (1)")).toBeVisible();
+  // A name typed in full is enough, without a click.
+  await name.fill("");
+  await name.pressSequentially("baumann, beat");
+  await name.press("Enter");
   await expect(page.getByText("Expiring soon")).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("My skills (1)")).toBeVisible();
+  await expect(name).toHaveValue("Baumann, Beat");
 });
 
 // The required scope, end to end: catalogue, assignment, certificates.
