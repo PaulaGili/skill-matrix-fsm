@@ -23,8 +23,9 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local tooling
-.claude/
+# local tooling, except the two review agents that are part of the method
+.claude/*
+!.claude/agents/
 
 # Playwright
 test-results

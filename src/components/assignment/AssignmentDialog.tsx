@@ -11,6 +11,7 @@ import { toUserMessage } from "@/lib/fsm/errors";
 import type { Assignment, Certificate, Person, Skill } from "@/lib/fsm/services/model";
 import { removeAssignments } from "@/lib/fsm/services/remove";
 import { saveAssignment } from "@/lib/fsm/services/save-assignment";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import { AssignmentFields, fieldsError, toInput } from "./AssignmentFields";
 import { CertificateSection } from "./CertificateSection";
 import styles from "./AssignmentDialog.module.css";
@@ -39,6 +40,7 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
   const aiEnabled = useAsyncData(isAiEnabled).data === true;
   const [suggestion, setSuggestion] = useState<(Suggestion & { fileName: string }) | null>(null);
   const [busy, setBusy] = useState(false);
+  const { t } = useI18n();
 
   const dateError = fieldsError(fields);
 
@@ -53,15 +55,15 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
         deleteCertificateIds: removedIds,
         uploads,
       });
-      if (failures.length === 0) return onSaved(saved ? "Assignment saved." : "Skill assigned.");
+      if (failures.length === 0) return onSaved(t(saved ? "assignment.saved" : "assignment.assigned"));
 
       // The assignment is saved, but some files were not uploaded. Keep those in the list.
       setSaved(nowSaved);
-      setMessages(failures.map((failure) => failure.message));
+      setMessages(failures.map((failure) => `${failure.fileName}: ${toUserMessage(failure.error, t)}`));
       setRemovedIds([]);
       setNewFiles(newFiles.filter((_, index) => failures.some((failure) => failure.index === index)));
     } catch (error) {
-      setMessages([toUserMessage(error)]);
+      setMessages([toUserMessage(error, t)]);
     }
     setBusy(false);
     onChanged();
@@ -76,9 +78,16 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
     try {
       setSuggestion({ fileName: file.name, ...checkFacts(await readCertificateFacts(file), person.displayName, todayIso()) });
     } catch (error) {
-      setMessages([toUserMessage(error)]);
+      setMessages([toUserMessage(error, t)]);
     }
     setBusy(false);
+  }
+
+  // What the AI read, as one text: the file, the dates if any, then the notes.
+  function suggestionText({ fileName, validFrom, validTo, notes }: Suggestion & { fileName: string }): string {
+    const date = (value: string | null) => (value ? formatDate(value) : t("assignment.notFound"));
+    const dates = validFrom || validTo ? [t("assignment.readDates", { from: date(validFrom), to: date(validTo) })] : [];
+    return [t("assignment.readByAi", { file: fileName }), ...dates, ...notes.map((note) => t(note.key, note.params))].join(" ");
   }
 
   function applySuggestion() {
@@ -90,9 +99,9 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
     setBusy(true);
     try {
       await removeAssignments(skill.id, [saved!.id]);
-      onSaved("Assignment removed.");
+      onSaved(t("assignment.removed"));
     } catch (error) {
-      setMessages([toUserMessage(error)]);
+      setMessages([toUserMessage(error, t)]);
       setBusy(false);
       onChanged();
     }
@@ -111,11 +120,11 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
             saved &&
             (confirmingRemove ? (
               <Button design="Negative" disabled={busy} onClick={remove}>
-                Remove now
+                {t("assignment.removeNow")}
               </Button>
             ) : (
               <Button design="Negative" disabled={busy} onClick={() => setConfirmingRemove(true)}>
-                Remove assignment...
+                {t("assignment.remove")}
               </Button>
             ))
           }
@@ -123,11 +132,11 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
             <>
               {!confirmingRemove && (
                 <Button design="Emphasized" disabled={busy || dateError !== null} onClick={save}>
-                  {saved ? "Save" : "Assign"}
+                  {t(saved ? "action.save" : "action.assign")}
                 </Button>
               )}
               <Button design="Transparent" disabled={busy} onClick={onClose}>
-                Cancel
+                {t("action.cancel")}
               </Button>
             </>
           }
@@ -143,21 +152,14 @@ export function AssignmentDialog({ person, skill, assignment, certificates, onCl
         {suggestion && (
           <MessageStrip design={suggestion.notes.length > 0 ? "Critical" : "Information"} onClose={() => setSuggestion(null)}>
             <div className={styles.suggestion}>
-              <Text>
-                Read from {suggestion.fileName} by AI.{" "}
-                {(suggestion.validFrom || suggestion.validTo) &&
-                  `Valid from ${suggestion.validFrom ? formatDate(suggestion.validFrom) : "not found"}, valid to ${suggestion.validTo ? formatDate(suggestion.validTo) : "not found"}. `}
-                {suggestion.notes.join(" ")}
-              </Text>
-              {(suggestion.validFrom || suggestion.validTo) && <Button onClick={applySuggestion}>Use these dates</Button>}
+              <Text>{suggestionText(suggestion)}</Text>
+              {(suggestion.validFrom || suggestion.validTo) && <Button onClick={applySuggestion}>{t("assignment.useDates")}</Button>}
             </div>
           </MessageStrip>
         )}
         {confirmingRemove && (
           <MessageStrip design="Critical" hideCloseButton>
-            This removes the assignment
-            {certificates.length > 0 ? ` and its ${certificates.length === 1 ? "certificate" : `${certificates.length} certificates`}` : ""}. It cannot be
-            undone.
+            {certificates.length > 0 ? t("assignment.removeWarningCertificates", { count: certificates.length }) : t("assignment.removeWarning")}
           </MessageStrip>
         )}
 

@@ -3,9 +3,10 @@ import "@ui5/webcomponents-react/styles.css";
 import "./globals.css";
 import { AppShell } from "@/components/common/AppShell";
 import { AppProviders } from "@/components/providers/AppProviders";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 
+// The tab title is set by AppShell, in the language of the user.
 export const metadata: Metadata = {
-  title: "Skill Management",
   description: "opusm assessment: skill matrix and certificates on SAP FSM",
 };
 
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AppProviders>
-          <AppShell>{children}</AppShell>
+          <I18nProvider>
+            <AppShell>{children}</AppShell>
+          </I18nProvider>
         </AppProviders>
       </body>
     </html>

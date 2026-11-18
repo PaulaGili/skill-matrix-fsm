@@ -8,6 +8,7 @@ import { toUserMessage } from "@/lib/fsm/errors";
 import type { Assignment, Certificate, Skill } from "@/lib/fsm/services/model";
 import { deleteSkillWithAssignments, retireSkill } from "@/lib/fsm/services/remove";
 import { deleteSkill } from "@/lib/fsm/services/skills";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import styles from "./SkillDialog.module.css";
 
 interface Props {
@@ -19,8 +20,6 @@ interface Props {
   onFailed: () => void; // the data may have changed, reload it
 }
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
-
 // A skill without assignments is deleted after a simple confirmation. A skill that is still
 // assigned can be retired or deleted together with everything attached to it.
 export function RemoveSkillDialog({ skill, assignments, certificates, onClose, onDone, onFailed }: Props) {
@@ -29,6 +28,8 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const confirmInput = useRef<InputDomRef>(null);
+  const { t } = useI18n();
+  const name = skill.name;
 
   useEffect(() => {
     if (confirmingDelete) confirmInput.current?.focus();
@@ -44,7 +45,7 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
       await action();
       onDone(message);
     } catch (error) {
-      setError(toUserMessage(error));
+      setError(toUserMessage(error, t));
       setBusy(false);
       onFailed();
     }
@@ -54,7 +55,7 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
     <Dialog
       open
       state={assigned ? "Critical" : "None"}
-      headerText={assigned ? `Remove ${skill.name}?` : `Delete ${skill.name}?`}
+      headerText={t(assigned ? "remove.titleAssigned" : "remove.titleUnassigned", { name })}
       initialFocus="remove-skill-cancel"
       onBeforeClose={(event) => busy && event.preventDefault()}
       onClose={onClose}
@@ -67,30 +68,30 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
               <Button
                 design="Negative"
                 disabled={busy || confirmName.trim() !== skill.name}
-                onClick={() => run(() => deleteSkillWithAssignments(skill.id), `${skill.name} deleted.`)}
+                onClick={() => run(() => deleteSkillWithAssignments(skill.id), t("remove.deleted", { name }))}
               >
-                Delete everything
+                {t("remove.deleteEverything")}
               </Button>
             ) : (
               <Button design="Negative" disabled={busy} onClick={() => setConfirmingDelete(true)}>
-                Delete everything...
+                {t("remove.deleteEverything")}...
               </Button>
             ))
           }
           endContent={
             <>
               {toEnd.length > 0 && !confirmingDelete && (
-                <Button design="Emphasized" disabled={busy} onClick={() => run(() => retireSkill(skill.id), `${skill.name} retired.`)}>
-                  Retire skill
+                <Button design="Emphasized" disabled={busy} onClick={() => run(() => retireSkill(skill.id), t("remove.retired", { name }))}>
+                  {t("remove.retire")}
                 </Button>
               )}
               {!assigned && (
-                <Button design="Negative" disabled={busy} onClick={() => run(() => deleteSkill(skill.id), `${skill.name} deleted.`)}>
-                  Delete
+                <Button design="Negative" disabled={busy} onClick={() => run(() => deleteSkill(skill.id), t("remove.deleted", { name }))}>
+                  {t("action.delete")}
                 </Button>
               )}
               <Button id="remove-skill-cancel" design="Transparent" disabled={busy} onClick={onClose}>
-                Cancel
+                {t("action.cancel")}
               </Button>
             </>
           }
@@ -103,27 +104,30 @@ export function RemoveSkillDialog({ skill, assignments, certificates, onClose, o
             {error}
           </MessageStrip>
         )}
-        {!assigned && <Text>This skill is not assigned to anyone.</Text>}
+        {!assigned && <Text>{t("remove.notAssigned")}</Text>}
         {assigned && (
           <Text>
-            {skill.name} has {plural(assignments.length, "assignment")} and {plural(certificates.length, "certificate")}.
+            {t("remove.has", {
+              name,
+              assignments: t("count.assignments", { count: assignments.length }),
+              certificates: t("count.certificates", { count: certificates.length }),
+            })}
           </Text>
         )}
         {toEnd.length > 0 && (
           <Text>
-            <b>Retire skill</b> ends the {plural(toEnd.length, "valid assignment")} as of yesterday, or today for one that started today. The history and
-            certificates are kept.
-            {toRemove.length > 0 && ` ${plural(toRemove.length, "assignment")} starting after today ${toRemove.length === 1 ? "is" : "are"} removed.`}
+            <b>{t("remove.retire")}</b> {t("remove.retireText", { count: toEnd.length })}
+            {toRemove.length > 0 && ` ${t("remove.futureRemoved", { count: toRemove.length })}`}
           </Text>
         )}
         {assigned && (
           <Text>
-            <b>Delete everything</b> permanently removes the skill, all its assignments and their certificates.
+            <b>{t("remove.deleteEverything")}</b> {t("remove.deleteText")}
           </Text>
         )}
         {confirmingDelete && (
           <>
-            <Label for="confirm-name">Type the skill name to confirm</Label>
+            <Label for="confirm-name">{t("remove.typeName")}</Label>
             <Input id="confirm-name" ref={confirmInput} value={confirmName} placeholder={skill.name} onInput={(event) => setConfirmName(event.target.value)} />
           </>
         )}

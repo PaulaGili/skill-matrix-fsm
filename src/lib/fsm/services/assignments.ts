@@ -3,6 +3,7 @@
 import { assertBulkOk, skillApi, skillSearch } from "@/lib/fsm/client";
 import { NAME_PREFIX, isOwnName } from "@/lib/candidate";
 import { OPEN_END_DATE, todayIso, validateValidity } from "@/lib/domain/status";
+import { UserError } from "@/lib/i18n/translate";
 import type { SkillServiceSkill } from "@/lib/fsm/types";
 import { OwnershipError } from "./ownership";
 import { requireOwnSkill } from "./skills";
@@ -14,9 +15,9 @@ export interface AssignmentInput {
   endDate: string | null;
 }
 
-export class ConflictError extends Error {
+export class ConflictError extends UserError {
   constructor() {
-    super("Someone else changed this assignment in the meantime. Reload and try again.");
+    super({ key: "error.assignmentConflict" });
     this.name = "ConflictError";
   }
 }
@@ -44,7 +45,7 @@ export async function requireOwnAssignments(skillId: string, ids: string[]): Pro
   const [skill, all] = await Promise.all([requireOwnSkill(skillId), listAssignments()]);
   const assignments = ids.map((id) => {
     const assignment = all.find((a) => a.id === id && a.skillId === skill.id);
-    if (!assignment) throw new OwnershipError(`Assignment ${id} is not an assignment of ${skill.name}.`);
+    if (!assignment) throw new OwnershipError({ key: "error.notAssignmentOfSkill", params: { id, skill: skill.name } });
     return assignment;
   });
   return { skill, assignments };
@@ -55,7 +56,7 @@ function validDates(input: AssignmentInput): { startDate: string; endDate: strin
   const startDate = input.startDate || todayIso();
   const endDate = input.endDate || null;
   const error = validateValidity(startDate, endDate);
-  if (error) throw new Error(error);
+  if (error) throw new UserError(error);
   return { startDate, endDate };
 }
 
@@ -65,13 +66,11 @@ export const MAX_BULK_ASSIGNMENTS = 20;
 // dozen records at most. A person who already has the skill is refused, so a retry or a
 // second browser tab cannot create a duplicate.
 export async function createAssignments(skillId: string, inputs: (AssignmentInput & { personId: string })[]): Promise<Assignment[]> {
-  if (inputs.length > MAX_BULK_ASSIGNMENTS) throw new Error(`At most ${MAX_BULK_ASSIGNMENTS} persons can be assigned at once.`);
+  if (inputs.length > MAX_BULK_ASSIGNMENTS) throw new UserError({ key: "error.tooManyPersons", params: { max: MAX_BULK_ASSIGNMENTS } });
   const dates = inputs.map(validDates);
   const [skill, existing] = await Promise.all([requireOwnSkill(skillId), listAssignments()]);
   const taken = inputs.filter((input) => existing.some((a) => a.skillId === skill.id && a.personId === input.personId));
-  if (taken.length > 0) {
-    throw new Error(`${taken.length === 1 ? "This person already has" : `${taken.length} of these persons already have`} ${skill.name}. Reload and try again.`);
-  }
+  if (taken.length > 0) throw new UserError({ key: "error.alreadyAssigned", params: { count: taken.length, skill: skill.name } });
   const body = inputs.map((input, index) => ({
     tagId: skill.id,
     technician: input.personId,

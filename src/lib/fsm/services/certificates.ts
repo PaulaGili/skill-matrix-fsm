@@ -3,8 +3,8 @@
 import { attachmentContentUrl, fsmCreate, fsmDelete, fsmQuery } from "@/lib/fsm/client";
 import { CANDIDATE_ID_VALID, NAME_PREFIX } from "@/lib/candidate";
 import { checkCertificateFile } from "@/lib/domain/certificate";
-import { toUserMessage } from "@/lib/fsm/errors";
 import type { FsmAttachment } from "@/lib/fsm/types";
+import { UserError } from "@/lib/i18n/translate";
 import { requireOwnAssignments } from "./assignments";
 import { OwnershipError } from "./ownership";
 import { dedupeById } from "./persons";
@@ -33,7 +33,7 @@ export function toCertificates(rows: AttachmentRow[]): Certificate[] {
 
 export async function listCertificates(): Promise<Certificate[]> {
   // The prefix goes into the query text, so it must be a validated candidate id.
-  if (!CANDIDATE_ID_VALID) throw new OwnershipError("NEXT_PUBLIC_CANDIDATE_ID is missing or invalid.");
+  if (!CANDIDATE_ID_VALID) throw new OwnershipError({ key: "error.candidateId" });
   const sql = `
     SELECT a.id, a.fileName, a.type, a.createDateTime, a.object.objectId
     FROM Attachment a
@@ -46,7 +46,8 @@ export async function listCertificates(): Promise<Certificate[]> {
 
 export interface UploadFailure {
   index: number; // position in the list of files that was passed in
-  message: string;
+  fileName: string;
+  error: unknown; // the UI turns it into a text with toUserMessage()
 }
 
 // Uploads the files one by one and reports each file that failed, so one bad file does not
@@ -59,7 +60,7 @@ export async function uploadCertificates(skillId: string, assignmentId: string, 
   for (const [index, file] of files.entries()) {
     const check = checkCertificateFile(file.fileName, file.sizeBytes);
     if (!check.ok) {
-      failures.push({ index, message: check.error });
+      failures.push({ index, fileName: file.fileName, error: new UserError(check.error) });
       continue;
     }
     try {
@@ -71,7 +72,7 @@ export async function uploadCertificates(skillId: string, assignmentId: string, 
         object: { objectId: assignmentId, objectType: "SKILL" },
       });
     } catch (error) {
-      failures.push({ index, message: `${file.fileName}: ${toUserMessage(error)}` });
+      failures.push({ index, fileName: file.fileName, error });
     }
   }
   return failures;

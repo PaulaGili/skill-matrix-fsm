@@ -67,7 +67,7 @@ run(async () => {
     }
     if (row.certificate && !withCertificate.has(assignment.id)) {
       const failures = await uploadCertificates(skill.id, assignment.id, [sampleCertificate("sample-certificate.pdf")]);
-      if (failures.length > 0) throw new Error(failures.join("; "));
+      if (failures.length > 0) throw new Error(`Upload failed: ${failures.map((failure) => failure.fileName).join(", ")}`);
     }
   }
   console.log("Seed done.");

@@ -10,6 +10,7 @@ import { listAssignments } from "@/lib/fsm/services/assignments";
 import { listCertificates } from "@/lib/fsm/services/certificates";
 import type { Skill } from "@/lib/fsm/services/model";
 import { listSkills } from "@/lib/fsm/services/skills";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import shell from "@/components/common/AppShell.module.css";
 import { RemoveSkillDialog } from "./RemoveSkillDialog";
 import { SkillDialog } from "./SkillDialog";
@@ -25,6 +26,7 @@ export function SkillCatalog() {
   const { data, error, loading, reload } = useAsyncData(loadCatalog);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const { toastElement, showToast } = useToast();
+  const { t } = useI18n();
 
   function finish(message: string) {
     setDialog(null);
@@ -41,33 +43,33 @@ export function SkillCatalog() {
     <div className={shell.panel}>
       <Bar
         design="Header"
-        startContent={<Title level="H3">Skills ({skills.length})</Title>}
+        startContent={<Title level="H3">{t("catalog.title", { count: skills.length })}</Title>}
         endContent={
           <Button design="Emphasized" icon="add" onClick={() => setDialog({ type: "create" })}>
-            Create skill
+            {t("catalog.create")}
           </Button>
         }
       />
       {error && <LoadError message={error} onRetry={reload} />}
 
       {skills.length === 0 ? (
-        <IllustratedMessage name="NoEntries" titleText="No skills yet" subtitleText="Create the first skill to start the matrix.">
-          <Button onClick={() => setDialog({ type: "create" })}>Create skill</Button>
+        <IllustratedMessage name="NoEntries" titleText={t("matrix.noSkillsTitle")} subtitleText={t("catalog.emptyText")}>
+          <Button onClick={() => setDialog({ type: "create" })}>{t("catalog.create")}</Button>
         </IllustratedMessage>
       ) : (
         <Table
           loading={loading}
-          accessibleName="Skills"
+          accessibleName={t("catalog.tableName")}
           overflowMode="Popin"
           headerRow={
             <TableHeaderRow>
-              <TableHeaderCell minWidth="12rem">Name</TableHeaderCell>
-              <TableHeaderCell minWidth="12rem">Description</TableHeaderCell>
+              <TableHeaderCell minWidth="12rem">{t("field.name")}</TableHeaderCell>
+              <TableHeaderCell minWidth="12rem">{t("field.description")}</TableHeaderCell>
               <TableHeaderCell width="8rem" horizontalAlign="Center">
-                Assignments
+                {t("catalog.assignments")}
               </TableHeaderCell>
               <TableHeaderCell width="7rem" horizontalAlign="End">
-                Actions
+                {t("field.actions")}
               </TableHeaderCell>
             </TableHeaderRow>
           }
@@ -87,15 +89,15 @@ export function SkillCatalog() {
                 <Button
                   design="Transparent"
                   icon="edit"
-                  accessibleName={`Edit ${skill.name}`}
-                  tooltip="Edit"
+                  accessibleName={t("catalog.editSkill", { name: skill.name })}
+                  tooltip={t("action.edit")}
                   onClick={() => setDialog({ type: "edit", skill })}
                 />
                 <Button
                   design="Transparent"
                   icon="delete"
-                  accessibleName={`Delete ${skill.name}`}
-                  tooltip="Delete"
+                  accessibleName={t("catalog.deleteSkill", { name: skill.name })}
+                  tooltip={t("action.delete")}
                   onClick={() => setDialog({ type: "remove", skill })}
                 />
               </TableCell>

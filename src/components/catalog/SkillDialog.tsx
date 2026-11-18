@@ -6,6 +6,7 @@ import { toUserMessage } from "@/lib/fsm/errors";
 import type { Skill } from "@/lib/fsm/services/model";
 import { ensureLevelScale } from "@/lib/fsm/services/scale";
 import { createSkill, skillNameError, updateSkill } from "@/lib/fsm/services/skills";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import styles from "./SkillDialog.module.css";
 
 interface Props {
@@ -21,10 +22,12 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
   const [nameError, setNameError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { t } = useI18n();
 
   function validate(): string | null {
     const duplicate = existingSkills.some((other) => other.id !== skill?.id && other.name.toLowerCase() === name.trim().toLowerCase());
-    return skillNameError(name) ?? (duplicate ? "A skill with this name already exists." : null);
+    const error = skillNameError(name) ?? (duplicate ? { key: "skill.duplicate" as const } : null);
+    return error && t(error.key);
   }
 
   async function save() {
@@ -42,9 +45,9 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
         const scale = await ensureLevelScale();
         await createSkill({ name, description, scaleId: scale.id });
       }
-      onSaved(skill ? "Skill saved." : "Skill created.");
+      onSaved(t(skill ? "skill.saved" : "skill.created"));
     } catch (error) {
-      setSaveError(toUserMessage(error));
+      setSaveError(toUserMessage(error, t));
       setSaving(false);
     }
   }
@@ -52,7 +55,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
   return (
     <Dialog
       open
-      headerText={skill ? "Edit skill" : "Create skill"}
+      headerText={t(skill ? "skill.editTitle" : "catalog.create")}
       onBeforeClose={(event) => saving && event.preventDefault()}
       onClose={onClose}
       footer={
@@ -61,10 +64,10 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
           endContent={
             <>
               <Button design="Emphasized" onClick={save} disabled={saving}>
-                {skill ? "Save" : "Create"}
+                {t(skill ? "action.save" : "action.create")}
               </Button>
               <Button design="Transparent" onClick={onClose} disabled={saving}>
-                Cancel
+                {t("action.cancel")}
               </Button>
             </>
           }
@@ -78,7 +81,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
           </MessageStrip>
         )}
         <Label for="skill-name" required>
-          Name
+          {t("field.name")}
         </Label>
         <Input
           id="skill-name"
@@ -93,7 +96,7 @@ export function SkillDialog({ skill, existingSkills, onClose, onSaved }: Props) 
           }}
           onKeyDown={(event) => event.key === "Enter" && save()}
         />
-        <Label for="skill-description">Description</Label>
+        <Label for="skill-description">{t("field.description")}</Label>
         <TextArea id="skill-description" value={description} rows={3} maxlength={500} onInput={(event) => setDescription(event.target.value)} />
       </div>
     </Dialog>

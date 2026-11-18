@@ -1,3 +1,5 @@
+import type { Message } from "@/lib/i18n/translate";
+
 export function daysUntil(date: string, today: string): number {
   return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
 }
@@ -10,7 +12,7 @@ export function expiringWithin<A extends { endDate: string | null }>(assignments
     .sort((a, b) => a.endDate!.localeCompare(b.endDate!));
 }
 
-export function dueText(days: number): string {
-  if (days === 0) return "today";
-  return days === 1 ? "tomorrow" : `in ${days} days`;
+export function dueText(days: number): Message {
+  if (days === 0) return { key: "due.today" };
+  return days === 1 ? { key: "due.tomorrow" } : { key: "due.inDays", params: { count: days } };
 }

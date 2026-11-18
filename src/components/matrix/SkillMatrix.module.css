@@ -87,3 +87,9 @@
 .cellButton:focus-visible .unassigned {
   display: none;
 }
+
+.ask {
+  flex: 1;
+  min-width: 16rem;
+  max-width: 44rem;
+}

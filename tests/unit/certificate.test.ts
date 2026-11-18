@@ -10,13 +10,13 @@ describe("checkCertificateFile", () => {
   });
 
   it("rejects other types and names without an extension", () => {
-    expect(checkCertificateFile("a.docx", 10).ok).toBe(false);
+    expect(checkCertificateFile("a.docx", 10)).toEqual({ ok: false, error: { key: "certificate.wrongType" } });
     expect(checkCertificateFile("pdf", 10).ok).toBe(false);
   });
 
   it("allows exactly 5 MB and rejects larger or empty files", () => {
     expect(checkCertificateFile("a.pdf", MAX_CERTIFICATE_BYTES).ok).toBe(true);
-    expect(checkCertificateFile("a.pdf", MAX_CERTIFICATE_BYTES + 1).ok).toBe(false);
-    expect(checkCertificateFile("a.pdf", 0).ok).toBe(false);
+    expect(checkCertificateFile("a.pdf", MAX_CERTIFICATE_BYTES + 1)).toEqual({ ok: false, error: { key: "certificate.tooLarge" } });
+    expect(checkCertificateFile("a.pdf", 0)).toEqual({ ok: false, error: { key: "certificate.empty" } });
   });
 });

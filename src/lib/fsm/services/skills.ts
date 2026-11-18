@@ -2,13 +2,14 @@
 // reads and writes the tag's scale.
 import { FsmError, assertBulkOk, skillApi, skillSearch } from "@/lib/fsm/client";
 import { NAME_PREFIX, fromScopedName, isOwnName, toScopedName } from "@/lib/candidate";
+import { UserError, type Message } from "@/lib/i18n/translate";
 import type { SkillServiceTag } from "@/lib/fsm/types";
 import { OwnershipError, assertOwnName } from "./ownership";
 import type { Skill } from "./model";
 
-export class SkillInUseError extends Error {
+export class SkillInUseError extends UserError {
   constructor(name: string) {
-    super(`${name} is still assigned to persons.`);
+    super({ key: "error.skillInUse", params: { name } });
     this.name = "SkillInUseError";
   }
 }
@@ -35,21 +36,21 @@ export async function listSkills(): Promise<Skill[]> {
 // wrong object cannot point a write at someone else's tag.
 export async function requireOwnSkill(id: string): Promise<Skill> {
   const skill = (await listSkills()).find((s) => s.id === id);
-  if (!skill) throw new OwnershipError(`Skill ${id} is not one of your skills or no longer exists.`);
+  if (!skill) throw new OwnershipError({ key: "error.skillGone", params: { id } });
   return skill;
 }
 
-export function skillNameError(name: string): string | null {
+export function skillNameError(name: string): Message | null {
   const trimmed = name.trim();
-  if (!trimmed) return "Name is required.";
-  if (trimmed.includes("::")) return 'Name must not contain "::".';
-  if (NAME_PREFIX.length + trimmed.length > 512) return "Name is too long.";
+  if (!trimmed) return { key: "skill.nameRequired" };
+  if (trimmed.includes("::")) return { key: "skill.nameSeparator" };
+  if (NAME_PREFIX.length + trimmed.length > 512) return { key: "skill.nameTooLong" };
   return null;
 }
 
 function scopedName(name: string): string {
   const error = skillNameError(name);
-  if (error) throw new Error(error);
+  if (error) throw new UserError(error);
   return toScopedName(name);
 }
 
