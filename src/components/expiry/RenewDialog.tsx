@@ -124,6 +124,7 @@ export function RenewDialog({ rows, onClose, onSaved, onChanged }: Props) {
           value={endDate}
           valueFormat="yyyy-MM-dd"
           displayFormat="dd.MM.yyyy"
+          placeholder={t("field.dateFormat")}
           disabled={busy}
           valueState={problem ? "Negative" : "None"}
           valueStateMessage={problem ? <span>{t(problem.key, problem.params)}</span> : undefined}
