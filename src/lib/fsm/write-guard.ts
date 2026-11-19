@@ -15,7 +15,9 @@ export interface OwnData {
 export function isRead(method: string, segments: string[]): boolean {
   if (method === "GET" || method === "HEAD") return true;
   // The Query API and every ".../search" of the Skill Service are reads sent as POST.
-  return method === "POST" && (segments[0] === "query" || segments[segments.length - 1] === "search");
+  if (method !== "POST") return false;
+  if (segments[0] === "query") return segments.length === 2;
+  return segments[0] === "skill" && segments[segments.length - 1] === "search";
 }
 
 const items = (body: unknown): Record<string, unknown>[] | null =>

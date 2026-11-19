@@ -22,7 +22,7 @@ interface Props {
 // Assigns one skill to several persons with the same level. The validity is the same for
 // everyone or set per person.
 export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved, onChanged }: Props) {
-  const [skillId, setSkillId] = useState(skills[0].id);
+  const [pickedSkillId, setSkillId] = useState(skills[0].id);
   const [pickedIds, setPersonIds] = useState<string[]>([]);
   const [fields, setFields] = useState<FieldValues>({ levelId: null, startDate: "", endDate: "" });
   const [sameDates, setSameDates] = useState(true);
@@ -31,7 +31,10 @@ export function BulkAssignDialog({ skills, persons, isAssigned, onClose, onSaved
   const [busy, setBusy] = useState(false);
   const { t } = useI18n();
 
-  const skill = skills.find((s) => s.id === skillId)!;
+  // The picked skill can be gone after a reload (deleted elsewhere): then the first one is taken.
+  const skill = skills.find((s) => s.id === pickedSkillId) ?? skills[0];
+  if (!skill) return null;
+  const skillId = skill.id;
   const candidates = persons.filter((person) => !isAssigned(person.id, skillId));
   // After a failed attempt the matrix reloads: who got the skill by then is no longer selected.
   const personIds = pickedIds.filter((id) => candidates.some((person) => person.id === id));
