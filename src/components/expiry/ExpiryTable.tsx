@@ -31,7 +31,7 @@ export function ExpiryTable({ title, rows, loading, sort, tickedIds, dueOf, hasC
       overflowMode="Popin"
       headerRow={
         <TableHeaderRow>
-          <TableHeaderCell width="3rem" importance={2} />
+          <TableHeaderCell width="4.5rem" importance={2} />
           <TableHeaderCell minWidth="7rem" importance={2} sortIndicator={sort.indicator("validTo")}>
             {t("field.validTo")}
           </TableHeaderCell>

@@ -47,7 +47,7 @@ export function ImportTable({ rows, fileNames, levelName, skipped, busy, onToggl
         overflowMode="Popin"
         headerRow={
           <TableHeaderRow>
-            <TableHeaderCell width="3rem" />
+            <TableHeaderCell width="4.5rem" />
             <TableHeaderCell width={fileNames ? "8rem" : "4rem"} sortIndicator={sort.indicator("line")}>
               {t(fileNames ? "import.file" : "import.row")}
             </TableHeaderCell>
