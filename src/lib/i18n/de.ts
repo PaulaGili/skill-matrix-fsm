@@ -69,6 +69,7 @@ export const de: Dictionary = {
   "field.validTo": "Gültig bis",
   "field.todayIfEmpty": "Heute, falls leer",
   "field.noEndDate": "Kein Enddatum",
+  "field.dateFormat": "TT.MM.JJJJ",
   "field.status": "Status",
   "field.datesHint": "Beide Datumsangaben sind optional. Ohne Gültig ab beginnt die Zuweisung heute, ohne Gültig bis endet sie nie.",
   "field.name": "Name",

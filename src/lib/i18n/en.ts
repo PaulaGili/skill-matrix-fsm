@@ -68,6 +68,7 @@ export const en = {
   "field.validTo": "Valid to",
   "field.todayIfEmpty": "Today if empty",
   "field.noEndDate": "No end date",
+  "field.dateFormat": "dd.mm.yyyy",
   "field.status": "Status",
   "field.datesHint": "Both dates are optional. Without valid from it starts today, without valid to it never ends.",
   "field.name": "Name",
