@@ -25,6 +25,8 @@ describe("isRead", () => {
     expect(isRead("POST", ["skill", "v1", "tags", "search"])).toBe(true);
     expect(isRead("POST", ["skill", "v2", "tags"])).toBe(false);
     expect(isRead("DELETE", ["skill", "v2", "tags", "search"])).toBe(false);
+    expect(isRead("POST", ["data", "v4", "Tag", "search"])).toBe(false);
+    expect(isRead("POST", ["query", "v1", "search"])).toBe(false);
   });
 });
 
