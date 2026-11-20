@@ -8,6 +8,8 @@ It also has five small AI helpers. You can ask the matrix a question, it reads t
 
 A hosted copy runs on Vercel. The link and the access code are in my email.
 
+A three-minute video shows the main features: [watch it on YouTube](https://www.youtube.com/watch?v=uVl-emSGGXY).
+
 I hope you like it.
 
 Where to find what:
